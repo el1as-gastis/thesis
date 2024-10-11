@@ -37,8 +37,8 @@ hdu_MUSE = fits.open(MUSE_file_path)
 wcs_MUSE = WCS(hdu_MUSE[1].header)
 
 # WCS information from the header
-CRVAL1, CRVAL2, CRVAL3 = wcs_MUSE.wcs.crval[:3]  # Reference values for RA, Dec, Wavelength
-CRPIX1, CRPIX2, CRPIX3 = wcs_MUSE.wcs.crpix[:3]  # Reference pixel locations for RA, Dec, Wavelength
+CRVAL1_muse, CRVAL2_muse, CRVAL3_muse = wcs_MUSE.wcs.crval[:3]  # Reference values for RA, Dec, Wavelength
+CRPIX1_muse, CRPIX2_muse, CRPIX3_muse = wcs_MUSE.wcs.crpix[:3]  # Reference pixel locations for RA, Dec, Wavelength
 
 # # Extracting the correct elements of the coordinate transformation matrix
 CD1 = wcs_MUSE.wcs.cd[0][0]  # First row of the CD matrix (RA axis)
@@ -69,4 +69,9 @@ obs_freq_max_GHz = 89.9202700541056671143
 # Redshift range of sources with expected observed CO transition
 z_min = (CO_rest_GHz / obs_freq_max_GHz) - 1
 z_max = (CO_rest_GHz / obs_freq_min_GHz) - 1
+
+# Determine number of channels over which to sum for the postage stamp
+c = 299792.458  # speed of light in km/s
+spectral_window_kms = 150  # Example width in km/s
+
 
