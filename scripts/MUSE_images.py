@@ -82,6 +82,10 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
         
         # Criteria for CO transition detection
         if '1203' in magpiid[0:4] and main.z_min < redshift < main.z_max and QOP >= 3:
+            
+            # plot this frquency (just 2 decimal places) above each ellipse
+            observed_frequency_GHz = main.CO_rest_GHz / (1 + redshift)  # GHz
+            
             # Extract x and y pixel coordinates, radius, axial ratio, and angle
             x_pixel = float(source[2])
             y_pixel = float(source[3])
@@ -101,6 +105,10 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
 
             # Add the ellipse to the plot
             plt.gca().add_patch(ellipse)
+
+            # Plot the observed frequency above each ellipse
+            plt.text(x_pixel, y_pixel + 5, f'{observed_frequency_GHz:.2f} GHz',
+                     fontsize=8, color='white', ha='center', va='bottom')
 
 # Set the major and minor ticks for the x-axis
 ax.xaxis.set_major_locator(plt.MultipleLocator(50))
