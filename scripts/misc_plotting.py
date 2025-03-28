@@ -12,9 +12,15 @@ import matplotlib.ticker as ticker
 
 import main 
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# ===== MANUALLY SET FIELD HERE ===== #
+# field = "1203" 
+# field = "1206"
+# field = "1501"
+# =================================== #
+
+
+
 # PLOTTING SFR vs STELLAR MASS  # 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 big_csv = main.big_csv
 
 with open(big_csv, mode='r') as big_csv:
@@ -50,7 +56,8 @@ with open(big_csv, mode='r') as big_csv:
             MAGPI_data.append([M_Stellar, SFR])
             MAGPI_Mass.append(M_Stellar)
             MAGPI_SFR.append(SFR)
-            if '1203' in magpiid[0:4]:
+
+            if '1203' in magpiid[0:4] or '1206' in magpiid[0:4] or '1501' in magpiid[0:4]:
                 # this plots all MAGPI1203 galaxies
                 MAGPI1203_data.append([M_Stellar, SFR])
                 if main.z_min < redshift < main.z_max:
@@ -76,8 +83,8 @@ for value in ALMA_SFR:
 plt.scatter(MAGPI_Mass, MAGPI_SFR, color='silver', label='MAGPI Galaxies 0.25 < z < 0.45', alpha=1, s=20, edgecolors='none')
 
 # Overplot ALMA data as red/blue dots with enhanced features
-plt.scatter(ALMA_Mass, ALMA_SFR, color='red', label='CO(1-0) Nondetections', s=50, edgecolors='black', alpha=1, marker='o')
-plt.scatter(detection_mass, detection_sfr, color='blue', label='CO(1-0) Detections', s=50, edgecolors='black', alpha=1, marker='o')
+plt.scatter(ALMA_Mass, ALMA_SFR, color='red', label='CO(1-0) Nondetections', s=30, edgecolors='black', alpha=1, marker='o')
+plt.scatter(detection_mass, detection_sfr, color='blue', label='CO(1-0) Detections', s=30, edgecolors='black', alpha=1, marker='o')
 
 # Log-log scale
 plt.xscale('log')

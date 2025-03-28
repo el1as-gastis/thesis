@@ -13,11 +13,15 @@ import matplotlib.ticker as ticker
 import main
 import field_images
 
+
+
 # ===== MANUALLY SET FIELD HERE ===== #
 field = "1203" 
 # field = "1206"
 # field = "1501"
 # =================================== #
+
+
 
 with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
     csv_reader = csv.reader(MAGPI_sources)
@@ -37,36 +41,27 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
             # Create a figure with two subplots (side by side)
             fig, axs = plt.subplots(1, 2, figsize=(6, 3))  # 1 row, 2 columns, 10x5 inch figure
 
-            # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-            # PLOT MUSE STAMPS  #
-            # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-
+            # PLOT MUSE STAMPS
             x_pixel, y_pixel = float(source[2]), float(source[3])
             
             # Create postage stamp for the source
-            postage_stamp_size = 48  # Adjust for field of view
+            postage_stamp_size = 12 / main.pixel_MUSE_x  # FOV (10 arcsec)
             x_min = int(x_pixel - postage_stamp_size // 2)
             x_max = int(x_pixel + postage_stamp_size // 2)
             y_min = int(y_pixel - postage_stamp_size // 2)
             y_max = int(y_pixel + postage_stamp_size // 2)
-            
-            # Set the extent in arcseconds for imshow
-            extent_x_min = (x_min - x_pixel) * main.pixel_MUSE_x
-            extent_x_max = (x_max - x_pixel) * main.pixel_MUSE_x
-            extent_y_min = (y_min - y_pixel) * main.pixel_MUSE_y
-            extent_y_max = (y_max - y_pixel) * main.pixel_MUSE_y
-
+         
             # CUTOUT THE STAMP FROM THE RGB IMAGE
             stamp = field_images.rgb_image[y_min:y_max, x_min:x_max]
 
             # Plot the MUSE postage stamp on axs[1]
-            axs[0].imshow(stamp, origin='lower', cmap='gray', extent=(extent_x_min, extent_x_max, extent_y_min, extent_y_max))
+            axs[0].imshow(stamp, origin='lower', cmap='gray', extent=[x_min, x_max, y_min, y_max])
 
             # Set the major and minor tick locators for both x and y axes for MUSE
-            axs[0].xaxis.set_major_locator(plt.MultipleLocator(2))
-            axs[0].xaxis.set_minor_locator(plt.MultipleLocator(2/5))
-            axs[0].yaxis.set_major_locator(plt.MultipleLocator(2))
-            axs[0].yaxis.set_minor_locator(plt.MultipleLocator(2/5))
+            axs[0].xaxis.set_major_locator(plt.MultipleLocator(2 / main.pixel_MUSE_x))
+            axs[0].xaxis.set_minor_locator(plt.MultipleLocator(2/ (5 * main.pixel_MUSE_x)))
+            axs[0].yaxis.set_major_locator(plt.MultipleLocator(2 / main.pixel_MUSE_x))
+            axs[0].yaxis.set_minor_locator(plt.MultipleLocator(2/ (5 * main.pixel_MUSE_x)))
 
             # Set major ticks on all four sides for MUSE
             axs[0].tick_params(axis="both", which="major", direction="in", top=True, bottom=True, left=True, right=True, length=8, width=1.5, labelleft=False, labelbottom=False, labelright=False, labeltop=False)
@@ -74,45 +69,37 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
             # Set minor ticks on all four sides for MUSE
             axs[0].tick_params(axis="both", which="minor", direction="in", top=True, bottom=True, left=True, right=True, length=4, width=1.5)
 
-            # Add a 2 arcsecond reference bar at the bottom right of the MUSE plot
-            scale_bar_x = extent_x_max - 2.9  # 5 arcseconds offset from the right edge
-            scale_bar_y = extent_y_min + 1  # 2 arcseconds above the bottom
-            scale_bar_length = 2  # 2 arcseconds
+            # SCALE BAR STUFF HERE
+            axs[0].add_patch(patches.Rectangle(xy = (x_max - (3 / main.pixel_MUSE_x), y_min + (1 / main.pixel_MUSE_x)), width = 2 / main.pixel_MUSE_x, height = 1 / (16 * main.pixel_MUSE_x), color = 'white'))
+            axs[0].text(x_max - (2 / main.pixel_MUSE_x), y_min + (1.2 / main.pixel_MUSE_x), '2"', color = 'white', fontsize = 10, ha = 'center')
 
-            # Create and add the scale bar for MUSE
-            scale_bar = patches.Rectangle((scale_bar_x, scale_bar_y), scale_bar_length, 0.1, linewidth=0.5, edgecolor='none', facecolor='white')
-            axs[0].add_patch(scale_bar)
-
-            # Add a label for the scale bar for MUSE
-            axs[0].text(scale_bar_x + scale_bar_length / 2, scale_bar_y - 0.2, '2"', horizontalalignment='center', verticalalignment='top', color='white')
-            
-            axs[0].text(0.05, 0.95, f'{magpiid}', 
-            transform=axs[0].transAxes, fontsize=16, verticalalignment='top', horizontalalignment='left', color='white')
+            axs[0].text(0.05, 0.95, f'{magpiid}', transform=axs[0].transAxes, fontsize=16, verticalalignment='top', horizontalalignment='left', color='white')
             
             axs[0].text(0.05, 0.85, f'z={redshift}', transform=axs[0].transAxes, fontsize=16, verticalalignment='top', horizontalalignment='left', color='white')
 
             # Adjust layout
             plt.tight_layout()    
 
-            # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+
+
+
             # PLOT ALMA STAMPS  #
-            # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
             ra = float(source[4])
             dec = float(source[5])
-            
+
             # Calculate observed frequency of CO(1-0) emission for source
             observed_frequency_GHz = main.CO_rest_GHz / (1 + redshift)  # GHz
             observed_frequency_Hz = observed_frequency_GHz * 1e9  # Hz
             spectral_window_Hz = (main.spectral_window_kms * observed_frequency_Hz) / main.c  # Window width in Hz
             num_channels = spectral_window_Hz / abs(main.CDELT3)  # Number of channels
-            
+
             # Calculate pixel coordinates for RA, Dec
             x_pixel = main.CRPIX1 + (ra - main.CRVAL1) / main.CDELT1
             y_pixel = main.CRPIX2 + (dec - main.CRVAL2) / main.CDELT2
 
-
             # Calculate pixel coordinate for frequency
-            z_pixel = main.CRPIX3 + (observed_frequency_Hz - main.CRVAL3) / main.CDELT3
+            z_pixel = (main.CRPIX3 + (observed_frequency_Hz - main.CRVAL3) / main.CDELT3 ) - 7
             
             # Round pixel values
             x_pixel, y_pixel, z_pixel = int(x_pixel), int(y_pixel), round(z_pixel)
@@ -121,47 +108,44 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
             lower_z_pixel = round(z_pixel - num_channels / 2)
 
             # Create postage stamp for the source
-            postage_stamp_size = 25  # Adjust for field of view
+            postage_stamp_size = 12 / main.pixel_ALMA_x  # FOV (10 arcsec)
             x_min = int(x_pixel - postage_stamp_size// 2)-1
             x_max = int(x_pixel + postage_stamp_size// 2)-1
             y_min = int(y_pixel - postage_stamp_size// 2)-1
             y_max = int(y_pixel + postage_stamp_size// 2)-1
 
             data_ALMA = main.hdu_ALMA.data[0] 
-            postage_stamp = np.sum(data_ALMA[lower_z_pixel:upper_z_pixel, y_min:y_max, x_min:x_max], axis=0)
+            # add the +1 since python indexing is exclusive of upper bound
+            postage_stamp = np.sum(data_ALMA[lower_z_pixel:upper_z_pixel + 1, y_min:y_max, x_min:x_max], axis=0)
 
-            # Set the extent in arcseconds for imshow
-            extent_x_min = (x_min - x_pixel) * main.pixel_ALMA_x
-            extent_x_max = (x_max - x_pixel) * main.pixel_ALMA_x
-            extent_y_min = (y_min - y_pixel) * main.pixel_ALMA_y
-            extent_y_max = (y_max - y_pixel) * main.pixel_ALMA_y
-
-            # Plot the ALMA postage stamp on axs[0]
-            axs[1].imshow(postage_stamp, origin='lower', cmap='inferno', extent=(extent_x_min, extent_x_max, extent_y_min, extent_y_max)) # vmin=vmin, vmax=vmax
+            # Plot the ALMA postage stamps
+            axs[1].imshow(postage_stamp, origin='lower', cmap='inferno', extent=[x_min, x_max, y_min, y_max]) 
 
             # Set the major and minor tick locators for both x and y axes for ALMA
-            axs[1].xaxis.set_major_locator(plt.MultipleLocator(2))
-            axs[1].xaxis.set_minor_locator(plt.MultipleLocator(2/5))
-            axs[1].yaxis.set_major_locator(plt.MultipleLocator(2))
-            axs[1].yaxis.set_minor_locator(plt.MultipleLocator(2/5))
+            axs[1].xaxis.set_major_locator(plt.MultipleLocator(2 / main.pixel_ALMA_x))
+            axs[1].xaxis.set_minor_locator(plt.MultipleLocator(2/ (5 * main.pixel_ALMA_x)))
+            axs[1].yaxis.set_major_locator(plt.MultipleLocator(2 / main.pixel_ALMA_x))
+            axs[1].yaxis.set_minor_locator(plt.MultipleLocator(2/ (5 * main.pixel_ALMA_x)))
 
             # Set major and minor ticks on all four sides for ALMA
             axs[1].tick_params(axis="both", which="major", direction="in", top=True, bottom=True, left=True, right=True, length=8, width=1.5, labelleft=False, labelbottom=False, labelright=False, labeltop=False)
             axs[1].tick_params(axis="both", which="minor", direction="in", top=True, bottom=True, left=True, right=True, length=4, width=1.5)
 
-            # Add a 2 arcsecond reference bar at the bottom right of the ALMA plot
-            scale_bar_x = extent_x_max - 2.9  # 5 arcseconds offset from the right edge
-            scale_bar_y = extent_y_min + 1  # 2 arcseconds above the bottom
-            scale_bar_length = 2  # 2 arcseconds
-            scale_bar = patches.Rectangle((scale_bar_x, scale_bar_y), scale_bar_length, 0.1, linewidth=0.5, edgecolor='none', facecolor='white')
-            axs[1].add_patch(scale_bar)
+            # SCALE BAR STUFF HERE
+            axs[1].add_patch(patches.Rectangle(xy = (x_max - (3 / main.pixel_ALMA_x), y_min + (1 / main.pixel_ALMA_x)), width = 2 / main.pixel_ALMA_x, height = 1 / (16 * main.pixel_ALMA_x), color = 'white'))
+            axs[1].text(x_max - (2 / main.pixel_ALMA_x), y_min + (1.2 / main.pixel_ALMA_x), '2"', color = 'white', fontsize = 10, ha = 'center')
 
-            # Add a label for the scale bar in the ALMA plot
-            axs[1].text(scale_bar_x + scale_bar_length / 2, scale_bar_y - 0.2, '2"', horizontalalignment='center', verticalalignment='top', color='white')
-
-            img1 = axs[1].imshow(postage_stamp, origin='lower', cmap='inferno', extent=(extent_x_min, extent_x_max, extent_y_min, extent_y_max)) # vmin=vmin, vmax=vmax
+            # Add PSF as an ellipse in the bottom left corner of the ALMA postage stamp
+            BMAJ = main.BMAJ_arcsec / main.pixel_ALMA_x  # Convert major axis to pixels
+            BMIN = main.BMIN_arcsec / main.pixel_ALMA_x  # Convert minor axis to pixels
+            BPA = main.BPA # Position angle in degrees
+         
+            axs[1].add_patch(patches.Ellipse(xy = (x_min + (2 / main.pixel_ALMA_x), y_min + (1.5 / main.pixel_ALMA_x)), width = BMIN, height = BMAJ, angle = BPA, edgecolor = 'lightgreen', facecolor = 'none'))
             
-            print(magpiid, redshift, x_pixel , y_pixel, z_pixel, QOP)
+            # # Centre and PSF allignment check
+            # axs[1].add_patch(patches.Ellipse(xy = (x_pixel, y_pixel), width = BMAJ, height = BMIN, angle = BPA - 90, edgecolor = 'lightgreen', facecolor = 'none'))
+            # axs[1].add_patch(patches.Rectangle(xy = (x_pixel, y_pixel), width = 1, height = 1, color = 'lightgreen'))
+
             plt.savefig(f'/home/el1as/github/thesis/figures/stamps/{field}/{magpiid}.png') 
             plt.clf()
 
