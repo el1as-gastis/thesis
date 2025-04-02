@@ -21,9 +21,9 @@ field = "1203"
 MAGPI_sources = '/home/el1as/github/thesis/data/catalogs/MAGPI_master_source_catalogue.csv'
 big_csv = '/home/el1as/github/thesis/data/catalogs/MAGPI_ProSpectCat_v0.2.csv'
 
-# EMISSION ONLY SOURCES
-emit_1203 = '/home/el1as/github/thesis/data/catalogs/MAGPI1203_segstats_el_updated.csv' 
-emit_1206 = '/home/el1as/github/thesis/data/catalogs/MAGPI1206_segstats_el_updated.csv'
+# # EMISSION ONLY SOURCES
+# emit_1203 = '/home/el1as/github/thesis/data/catalogs/MAGPI1203_segstats_el_updated.csv' 
+# emit_1206 = '/home/el1as/github/thesis/data/catalogs/MAGPI1206_segstats_el_updated.csv'
 emit_1501 = '/home/el1as/github/thesis/data/catalogs/MAGPI1501_segstats_el_updated.csv'
 
 

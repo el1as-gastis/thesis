@@ -19,6 +19,9 @@ field = "1203"
 # field = "1501"
 # =================================== #
 
+spectra_to_stack = []
+
+
 with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
     csv_reader = csv.reader(MAGPI_sources)
 
@@ -31,10 +34,10 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
         redshift = float(source[6])
         QOP = int(source[7])
         
+        ra = float(source[4])
+        dec = float(source[5])
 
-        if '6068' in magpiid and main.z_min < redshift < main.z_max and QOP >= 3:
-            ra = float(source[4])
-            dec = float(source[5])
+        if '76068' in magpiid and main.z_min < redshift < main.z_max and QOP >= 3: # and main.z_min < redshift < main.z_max and QOP >= 3
 
             # Calculate observed frequency of CO(1-0) emission for source
             observed_frequency_GHz = main.CO_rest_GHz / (1 + redshift)  # GHz
@@ -49,7 +52,7 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
 
             # Calculate pixel coordinate for frequency
             z_pixel = main.CRPIX3 + (observed_frequency_Hz - main.CRVAL3) / main.CDELT3
-            
+
             # Round pixel values
             x_pixel, y_pixel, z_pixel = int(x_pixel), int(y_pixel), round(z_pixel)
             
@@ -58,190 +61,187 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
 
             data_ALMA = main.hdu_ALMA.data.squeeze()
 
-            # # Function to check if a pixel lies inside an elliptical aperture
-            BMAJ = main.BMAJ_arcsec / main.pixel_ALMA_x
-            BMIN = main.BMIN_arcsec / main.pixel_ALMA_x
-            BPA = main.BPA
+            from astropy.coordinates import Angle
+            from photutils.aperture import EllipticalAperture
+            from photutils.aperture import aperture_photometry
+
+            # Add PSF as an ellipse in the bottom left corner of the ALMA postage stamp
+            BMAJ = main.BMAJ_arcsec / main.pixel_ALMA_x  # Convert major axis to pixels
+            BMIN = main.BMIN_arcsec / main.pixel_ALMA_x  # Convert minor axis to pixels
+            BPA = main.BPA # Position angle in degrees
+            ANGLE = Angle(90 + BPA, 'deg')
+
+            aperture = EllipticalAperture((x_pixel, y_pixel), a = BMAJ, b = BMIN, theta=ANGLE)
+
             spectrum = []
-            
-            
-            def inside_ellipse(x, y, BMAJ, BMIN, BPA, x_center, y_center):
-                # Convert BPA from degrees to radians
-                BPA_rad = np.radians(BPA)
+
+            for freq_bin in range(data_ALMA.shape[0]):
+                image_2d = data_ALMA[freq_bin, :, :]
+                phot_table = aperture_photometry(image_2d, aperture)
                 
-                # Rotate the pixel coordinates based on the position angle
-                x_rot = (x - x_center) * np.cos(BPA_rad) + (y - y_center) * np.sin(BPA_rad)
-                y_rot = -(x - x_center) * np.sin(BPA_rad) + (y - y_center) * np.cos(BPA_rad)
-                
-                # Normalize by the beam semi-major and semi-minor axes
-                ellipse_condition = (x_rot**2 / (BMAJ/2)**2 + y_rot**2 / (BMIN/2)**2) <= 1
-                return ellipse_condition
-
-            spectrum_grid_size = 10 / main.pixel_ALMA_x  # spectrum FOV (10 arcsec)
-            x_min = int(x_pixel - spectrum_grid_size // 2)
-            x_max = int(x_pixel + spectrum_grid_size // 2)
-            y_min = int(y_pixel - spectrum_grid_size // 2)
-            y_max = int(y_pixel + spectrum_grid_size // 2)
-
-            for freq_bin in range(z_pixel - 40, z_pixel + 40):
-                flux_sum = 0
-
-                # loop through the grid around the source pixel and apply a gaussian weight to it when adding to total flux
-                for i in range(y_min, y_max):
-                    for j in range(x_min, x_max):
-
-                        if inside_ellipse(j, i, BMAJ, BMIN, BPA, x_pixel, y_pixel):
-                        # Add the flux of the pixel to the total flux sum
-                            flux_sum += 1000 * np.nan_to_num(data_ALMA[freq_bin, i, j])
-
-                spectrum.append(flux_sum)
+                # 'aperture_sum' is the key containing the summed flux in the aperture
+                flux_sum = phot_table['aperture_sum'][0]
+                spectrum.append(1000 * flux_sum)  # Convert to mJy
 
             plt.figure(figsize=(6, 3))
 
-            signal_channels = round(num_channels)
-            
-            signal_samples = []
-            noise_samples = []
-            
-            for value in spectrum:
-                if value in spectrum[35:45]:
-                    signal_samples.append(abs(value))
-                
-                elif value not in spectrum[30:50]:
-                    noise_samples.append(value)
+            signal_indices = np.arange(z_pixel - 9, z_pixel + 8)  # Define the channel range with the signal
 
-            signal = np.mean(signal_samples)
-            noise = np.std(noise_samples)
-            
-            SNR = signal / noise
-            SNR_formatted = "{:.3g}".format(SNR)
-            
-            frequency_bins = np.linspace(z_pixel - 40, z_pixel + 40, len(spectrum) + 1)
+            noise_indices = noise_indices = np.concatenate([
+np.arange(z_pixel - 40, z_pixel - 15), 
+    np.arange(z_pixel + 15, z_pixel + 40)
+])
+
+            # Compute integrated signal in mJy
+            line_flux = np.sum([spectrum[i] for i in signal_indices]) 
+
+            # Estimate noise as std of channels with no signal
+            noise_std = np.std([spectrum[i] for i in noise_indices])  # mJy
+
+            # Estimate SNR as line flux divided by noise over sqrt(N)
+            num_signal_bins = len(signal_indices)
+            SNR = line_flux / (noise_std * np.sqrt(num_signal_bins))
+            SNR_formatted = f"{SNR:.3g}"
+
+            frequency_bins = np.linspace(0, data_ALMA.shape[0], data_ALMA.shape[0] + 1)
+
             v_observed = main.obs_freq_min_GHz + (frequency_bins * main.bin_width)
             velocity_bins_kms = main.c * ((main.CO_rest_GHz/v_observed)**2 - 1) / ((main.CO_rest_GHz/v_observed)**2 + 1)
             velocity_shifted_bins = velocity_bins_kms - main.c * ((1+redshift)**2 - 1) / ((1+redshift)**2 + 1)
 
             # # Plot the spectrum against the frequency bins
-            # plt.bar(velocity_shifted_bins[:-1] + np.diff(frequency_bins) / 2, spectrum, alpha=0.5, edgecolor = 'black', color='lightblue', width = np.diff(velocity_shifted_bins))
+            start_signal = velocity_shifted_bins[signal_indices[0]]
+            end_signal   = velocity_shifted_bins[signal_indices[-1] + 1]
+ 
+            channel_min = z_pixel - 40
+            channel_max = z_pixel + 40
 
-            # Plot a continuous line (black line, adjust linewidth as needed)
-            plt.step(velocity_shifted_bins[:-1] + np.diff(frequency_bins) / 2, spectrum, where='mid', color='black', linewidth=1, label='Spectrum')
+            plot_spectrum = spectrum[channel_min:channel_max]
+            plot_velocity = velocity_shifted_bins[channel_min:channel_max+1]
+            plot_freq_bins = frequency_bins[channel_min:channel_max+1]
 
+            # THIS CONDITION IS FOR STACKING ANALYSIS
+            detection_ids = ['1203040085', '1203076068', '1206030269', '1501176107', '1501224275', '1501259290']
+            if magpiid not in detection_ids:
+                # Convert bin edges to centers (length will match flux values)
+                velocity_centers = (plot_velocity[:-1] + plot_velocity[1:]) / 2
 
-            # Add dashed vertical lines at +75 km/s and -75 km/s
-            plt.axvline(x = 150, color = 'red', linestyle = '--', label = '+75 km/s', alpha = 0.5)
-            plt.axvline(x = -175, color = 'red', linestyle = '--', label = '+75 km/s', alpha = 0.5)
+                spectra_to_stack.append([magpiid, velocity_centers, plot_spectrum])
 
-            # Add text annotations (magpiid, redshift, S/N)
-            plt.text(0.05, 0.95, f'{magpiid}', transform=plt.gca().transAxes, fontsize=10, 
-                    verticalalignment='top', horizontalalignment='left', color='black')
+            # plt.axvspan(start_signal, end_signal, color='gray', alpha=0.3, label='Signal region')
 
-            plt.text(0.05, 0.85, f'z={redshift}', transform=plt.gca().transAxes, fontsize=10, 
-                    verticalalignment='top', horizontalalignment='left', color='black')
+            # # Plot a continuous line (black line, adjust linewidth as needed)
+            # plt.step(plot_velocity[:-1] + np.diff(plot_freq_bins) / 2, plot_spectrum, where='mid', color='black', linewidth=1, label='Spectrum')
 
-            plt.text(0.95, 0.95, f'S/N = {SNR_formatted}', transform=plt.gca().transAxes, fontsize=10, 
-                    verticalalignment='top', horizontalalignment='right', color='black')  # Fixed alignment
+            # # Add dashed vertical lines at +75 km/s and -75 km/s
+            # plt.axvline(x=start_signal, color='red', linestyle='--', label='Signal region limit', alpha=0.5)
+            # plt.axvline(x=end_signal,   color='red', linestyle='--', label='Signal region limit', alpha=0.5)
 
-            # Get current axis
-            ax = plt.gca()
-            # **Enable ticks on all four sides**
-            ax.tick_params(axis='both', which='both', direction='in', length=6, width=1.5, top=True, bottom=True, left=True, right=True)
-            # **Set major and minor tick locations**
-            ax.xaxis.set_major_locator(ticker.AutoLocator())  # Auto major ticks on X-axis
-            ax.yaxis.set_major_locator(ticker.AutoLocator())  # Auto major ticks on Y-axis
-            ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())  # Minor ticks for X-axis
-            ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())  # Minor ticks for Y-axis
+            # # Add text annotations (magpiid, redshift, S/N)
+            # plt.text(0.05, 0.95, f'{magpiid}', transform=plt.gca().transAxes, fontsize=10, 
+            #         verticalalignment='top', horizontalalignment='left', color='black')
 
-            # Customize tick parameters
-            plt.tick_params(axis='both', which='major', direction='in', length=6, width=1.5)  # Major ticks
-            plt.tick_params(axis='both', which='minor', direction='in', length=3, width=1)  # Minor ticks
+            # plt.text(0.05, 0.85, f'z={redshift}', transform=plt.gca().transAxes, fontsize=10, 
+            #         verticalalignment='top', horizontalalignment='left', color='black')
 
-            # Adjust the xlim to remove the whitespace between the first and last bins
-            plt.xlim(velocity_shifted_bins[0], velocity_shifted_bins[-1])
+            # plt.text(0.95, 0.95, f'S/N = {SNR_formatted}', transform=plt.gca().transAxes, fontsize=10, 
+            #         verticalalignment='top', horizontalalignment='right', color='black')  # Fixed alignment
 
-            # Set labels and title for the plot
-            plt.xlabel('v - cz [km s]')
-            plt.ylabel('Flux Density [mJy]')
+            # # Get current axis
+            # ax = plt.gca()
+            # # **Enable ticks on all four sides**
+            # ax.tick_params(axis='both', which='both', direction='in', length=6, width=1.5, top=True, bottom=True, left=True, right=True)
+            # # **Set major and minor tick locations**
+            # ax.xaxis.set_major_locator(ticker.AutoLocator())  # Auto major ticks on X-axis
+            # ax.yaxis.set_major_locator(ticker.AutoLocator())  # Auto major ticks on Y-axis
+            # ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())  # Minor ticks for X-axis
+            # ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())  # Minor ticks for Y-axis
+
+            # # Customize tick parameters
+            # plt.tick_params(axis='both', which='major', direction='in', length=6, width=1.5)  # Major ticks
+            # plt.tick_params(axis='both', which='minor', direction='in', length=3, width=1)  # Minor ticks
+
+            # # Adjust the xlim to remove the whitespace between the first and last bins
+            # plt.xlim(plot_velocity[0], plot_velocity[-1])
+
+            # # Set labels and title for the plot
+            # plt.xlabel('v - cz [km s]')
+            # plt.ylabel('Flux Density [mJy]')
             
-            # LASTLY, fit the guassian to the spectra, I suspect only to detection?
-            if SNR > 3:
-                amplitude_guess = np.max(spectrum)
-                mean_guess = 0
-                std_dev_guess = 100
+            # # LASTLY, fit the guassian to the spectra, I suspect only to detection?
+            # if SNR > 3:
+            #     amplitude_guess = np.max(spectrum)
+            #     mean_guess = 0
+            #     std_dev_guess = 100
 
-                x_centers = (velocity_shifted_bins[:-1] + velocity_shifted_bins[1:]) / 2
+            #     x_centers = (velocity_shifted_bins[:-1] + velocity_shifted_bins[1:]) / 2
 
-                # Define the initial Gaussian model
-                gauss_init = models.Gaussian1D(amplitude=amplitude_guess, mean=mean_guess, stddev=std_dev_guess)
+            #     # Define the initial Gaussian model
+            #     gauss_init = models.Gaussian1D(amplitude=amplitude_guess, mean=mean_guess, stddev=std_dev_guess)
 
-                # Set up the fitter
-                fitter = fitting.LevMarLSQFitter()
+            #     # Set up the fitter
+            #     fitter = fitting.LevMarLSQFitter()
 
-                # Fit the Gaussian to the data
-                gauss_fit = fitter(gauss_init, x_centers, spectrum)
+            #     # Fit the Gaussian to the data
+            #     gauss_fit = fitter(gauss_init, x_centers, spectrum)
 
-                # Print the fitted parameters
-                print("Fitted Gaussian parameters:")
-                print("Amplitude: {:.3g}".format(gauss_fit.amplitude.value))
-                print("Mean: {:.3g}".format(gauss_fit.mean.value))
-                print("Stddev: {:.3g}".format(gauss_fit.stddev.value))
+            #     # Print the fitted parameters
+            #     print("Fitted Gaussian parameters:")
+            #     print("Amplitude: {:.3g}".format(gauss_fit.amplitude.value))
+            #     print("Mean: {:.3g}".format(gauss_fit.mean.value))
+            #     print("Stddev: {:.3g}".format(gauss_fit.stddev.value))
 
-                plt.plot(x_centers, gauss_fit(x_centers), color='blue', alpha = 0.5, linewidth=1, label='Gaussian Fit')
+            #     plt.plot(x_centers, gauss_fit(x_centers), color='blue', alpha = 0.5, linewidth=1, label='Gaussian Fit')
 
-            plt.savefig(f'/home/el1as/github/thesis/figures/spectra/{field}/{magpiid}.png') 
+            # # plt.savefig(f'/home/el1as/github/thesis/figures/spectra/{field}/{magpiid}.png') 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            # Extract line spectrum by 2D gaussian weighting 
-            # Define 2D gaussian to be PSF of beam??
-            # BPA_radians = np.radians(main.BPA)
-            # sigma_x = (main.BMAJ_arcsec * np.cos(BPA_radians) + main.BMIN_arcsec * np.sin(BPA_radians)) / (2 * np.sqrt(2 * np.log(2)))
-            # sigma_y = (main.BMAJ_arcsec * np.sin(BPA_radians) + main.BMIN_arcsec * np.cos(BPA_radians)) / (2 * np.sqrt(2 * np.log(2)))
-            # spectrum = []
-
-            # gaussian = models.Gaussian2D(amplitude = 1, x_mean = 0, y_mean = 0, x_stddev = sigma_x, y_stddev = sigma_y, theta = BPA_radians)
+            # === CO Luminosity Calculation ===
             
-            # spectrum_grid_size = 10 / main.pixel_ALMA_x  # spectrum FOV (10 arcsec)
-            # x_min = int(x_pixel - spectrum_grid_size // 2)
-            # x_max = int(x_pixel + spectrum_grid_size // 2)
-            # y_min = int(y_pixel - spectrum_grid_size // 2)
-            # y_max = int(y_pixel + spectrum_grid_size // 2)
+            from astropy.cosmology import Planck15 as cosmo
 
-            # for freq_bin in range(z_pixel - 30, z_pixel + 31):
-            #     flux_sum = 0
+            # Get the total width of the signal region in km/s
+            spectrum_array = np.array(spectrum)
+            flux_density = spectrum_array[signal_indices] / 1000  # Jy
+            dv_bins = np.abs(np.diff(velocity_shifted_bins[signal_indices[0]:signal_indices[-1] + 2]))  # km/s
+            line_flux_Jy_kms = np.sum(flux_density * dv_bins)
 
-            #     # loop through the grid around the source pixel and apply a gaussian weight to it when adding to total flux
-            #     for i in range(y_min, y_max):
-            #         for j in range(x_min, x_max):
-                        
-            #             # compute pixel distance from source centre
-            #             x_shift = j - x_pixel
-            #             y_shift = i - y_pixel
+            line_flux_Jy_kms = 3.44
+            redshift =  0.0380
+            m_stellar = 10.16
+            observed_frequency_GHz = 111.0500963
+            # Luminosity distance in Mpc
+            D_L = cosmo.luminosity_distance(redshift).value  # Mpc
 
-            #             weight = gaussian(x_shift, y_shift)
-            #             # Add weighted flux from this pixel to the total flux sum
-            #             flux_sum += 1000 * np.nan_to_num(data_ALMA[freq_bin, i, j]) * weight
+            # L'_CO in K km/s pc^2
+            L_CO_prime = 3.25e7 * line_flux_Jy_kms * D_L**2 * observed_frequency_GHz**-2 * (1 + redshift)**-3
 
-            #     spectrum.append(flux_sum)
+            print(f"Line flux: {line_flux_Jy_kms:.2f} Jy km/s")
+            print(f"L'_CO = {L_CO_prime:.2e} K km/s pc^2")
+
+
+
+# v_stack = np.arange(-700, 700 + 50, 50)  # Includes 700
+
+# from scipy.interpolate import interp1d
+# stacked_fluxes = []
+
+# for magpiid, v_original, flux_original in spectra_to_stack:
+#     interp_func = interp1d(v_original, flux_original, kind='linear',
+#                            bounds_error=False, fill_value=0.0)
+#     resampled_flux = interp_func(v_stack)
+#     stacked_fluxes.append(resampled_flux)
+
+# stacked_spectrum = np.sum(stacked_fluxes, axis=0)
+
+# plt.figure(figsize=(6, 3))
+# plt.step(v_stack, stacked_spectrum, where='mid', color='black', linewidth=1.2)
+# plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+# plt.xlabel("Velocity [km/s]")
+# plt.ylabel("Flux Density [mJy]")
+# plt.title("Stacked CO(1-0) Spectrum (Non-Detections)")
+# plt.grid(True, which='both', linestyle=':', alpha=0.3)
+# plt.tight_layout()
+# plt.savefig(f'/home/el1as/github/thesis/figures/stacks/stackattempt_{field}.png') 
+
+
+

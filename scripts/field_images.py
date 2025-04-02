@@ -82,7 +82,7 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
         QOP = int(source[7])
         
         # Criteria for CO transition detection
-        if field in magpiid[0:4] and main.z_min < redshift < main.z_max and QOP >= 3:
+        if field in magpiid[0:4]: #  and main.z_min < redshift < main.z_max and QOP >= 3
             # Extract x and y pixel coordinates, radius, axial ratio, and angle
             x_pixel = float(source[2])
             y_pixel = float(source[3])
@@ -99,6 +99,8 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
             # Create an Ellipse patch with converted dimensions in pixels
             ellipse = patches.Ellipse((x_pixel, y_pixel), 2*radius_pixels, 2*semi_minor_axis_pixels, 
                                       angle=angle, edgecolor='lightgreen', facecolor='none', lw=1.5)
+
+            ax.text(x_pixel, y_pixel + radius_pixels + 3, magpiid[-4:], color='white', fontsize=5, ha='center', va='bottom')
 
             # Add the ellipse to the plot
             plt.gca().add_patch(ellipse)
