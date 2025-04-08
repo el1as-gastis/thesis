@@ -16,12 +16,10 @@ import field_images
 
 
 # ===== MANUALLY SET FIELD HERE ===== #
-field = "1203" 
+# field = "1203" 
 # field = "1206"
-# field = "1501"
+field = "1501"
 # =================================== #
-
-
 
 with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
     csv_reader = csv.reader(MAGPI_sources)
@@ -39,8 +37,8 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
         dec = float(source[5])
 
         # Criteria for CO transition detection
-        if '1168' in magpiid and main.z_min < redshift < main.z_max and QOP >= 3: # and main.z_min < redshift < main.z_max and QOP >= 3
-            
+        if field in magpiid[0:4] and main.z_min < redshift < main.z_max and QOP >= 3: # and main.z_min < redshift < main.z_max and QOP >= 3
+
             # Create a figure with two subplots (side by side)
             fig, axs = plt.subplots(1, 2, figsize=(6, 3))  # 1 row, 2 columns, 10x5 inch figure
 
@@ -80,9 +78,6 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
             axs[0].text(0.05, 0.95, f'{magpiid}', transform=axs[0].transAxes, fontsize=16, verticalalignment='top', horizontalalignment='left', color='white')
             
             axs[0].text(0.05, 0.85, f'z={redshift}', transform=axs[0].transAxes, fontsize=16, verticalalignment='top', horizontalalignment='left', color='white')
-
-            # axs[0].text(0.05, 0.85, f'{ra, dec}', transform=axs[0].transAxes, fontsize=10, verticalalignment='top', horizontalalignment='left', color='white')
-
             
             # Adjust layout
             plt.tight_layout()    
@@ -110,10 +105,16 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
             # Round pixel values
             x_pixel, y_pixel, z_pixel = int(x_pixel), int(y_pixel), round(z_pixel)
             
-            # upper_z_pixel = round(z_pixel + num_channels / 2)
-            # lower_z_pixel = round(z_pixel - num_channels / 2)
-            upper_z_pixel = z_pixel - 1
-            lower_z_pixel = z_pixel - 8
+            # Lower and upper bounds for channel integration
+            # Set this manually for detections! 
+            upper_z_pixel = z_pixel + 7
+            lower_z_pixel = z_pixel - 7
+
+            for galaxy in main.detections:
+                if magpiid == galaxy[0]:
+                    lower_z_pixel = z_pixel + galaxy[1]
+                    upper_z_pixel = z_pixel + galaxy[2]
+                    break  # Exit the loop once matched
 
             # Create postage stamp for the source
             postage_stamp_size = 12 / main.pixel_ALMA_x  # FOV (10 arcsec)
@@ -160,32 +161,6 @@ with open(main.MAGPI_sources, mode='r') as MAGPI_sources:
             # Plot the aperture (you need to pass the axis to .plot method)
             aperture.plot(ax=axs[1], color='cyan', lw=1.5)
 
-            # print(magpiid, x_pixel, y_pixel, redshift, QOP, ra, dec)
-            # print(magpiid, x_pixel, y_pixel, redshift)
-
 
             plt.savefig(f'/home/el1as/github/thesis/figures/stamps/{field}/{magpiid}.png') 
             plt.clf()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            # print(x_pixel, y_pixel, redshift, magpiid, QOP)
-            # z_pixel = 199
-            # v_obs = main.CRVAL3 + (z_pixel-main.CRPIX3) * main.CDELT3
-            # print(v_obs)
-            # v_rest = v_obs*(1+redshift)
-            # print(v_rest)

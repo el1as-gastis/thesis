@@ -91,3 +91,12 @@ spectral_window_kms = 250  # width in km/s
 
 # Bin width in GHz
 bin_width = CDELT3 / 1e9
+
+
+# Make a list of detection IDs and characteristic linewidth
+detections = [['1203040085', -3, 14], ['1203076068', -9, 8], ['1203081168', -9, 0], 
+              ['1206030269', -15, -2],
+              ['1501176107', -12, 2], ['1501224275', -10, 5], ['1501259290', -4, 6]]
+
+# CHECK ON 1501101303, 1501135126
+
