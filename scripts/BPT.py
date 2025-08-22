@@ -11,53 +11,55 @@ import matplotlib.ticker as ticker
 
 import main
 
+
+det_x, det_y = [], []
+undet_x, undet_y = [], []
+other_x, other_y = [], []
+
 # =========================
 # ALMA-FIELD STATISTICS
 # =========================
-det_x, det_y = [], []
-undet_x, undet_y = [], []
+# for field in main.field_limits.keys():
+#     with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
+#         csv_reader = csv.reader(MAGPI_sources)
 
-for field in main.field_limits.keys():
-    with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
-        csv_reader = csv.reader(MAGPI_sources)
+#         # Skip header
+#         for _ in range(18):
+#             next(csv_reader, None)
 
-        # Skip header
-        for _ in range(18):
-            next(csv_reader, None)
+#         for source in csv_reader:
+#             magpiid  = source[0]
+#             redshift = float(source[6])
+#             QOP      = int(source[7])
 
-        for source in csv_reader:
-            magpiid  = source[0]
-            redshift = float(source[6])
-            QOP      = int(source[7])
+#             z_min, z_max = main.field_limits[field]
+#             if not (magpiid.startswith(field) and z_min < redshift < z_max and QOP >= 3):
+#                 continue
 
-            z_min, z_max = main.field_limits[field]
-            if not (magpiid.startswith(field) and z_min < redshift < z_max and QOP >= 3):
-                continue
+#             # GIST MAPS FILE PATH
+#             GIST_EmitLines = f"/home/el1as/github/thesis/data/MUSE/GIST/{field}/MAGPI{magpiid}_GIST_EmissionLines.fits"
 
-            # GIST MAPS FILE PATH
-            GIST_EmitLines = f"/home/el1as/github/thesis/data/MUSE/GIST/{field}/MAGPI{magpiid}_GIST_EmissionLines.fits"
+#             with fits.open(GIST_EmitLines) as hdul:
+#                 Halpha = hdul['Ha_F'].data
+#                 Hbeta  = hdul['Hb_F'].data
+#                 OIII   = hdul['OIII_5008_F'].data
+#                 NII    = hdul['NII_6585_F'].data
 
-            with fits.open(GIST_EmitLines) as hdul:
-                Halpha = hdul['Ha_F'].data
-                Hbeta  = hdul['Hb_F'].data
-                OIII   = hdul['OIII_5008_F'].data
-                NII    = hdul['NII_6585_F'].data
+#             Ha_val  = np.nanmedian(Halpha)
+#             Hb_val  = np.nanmedian(Hbeta)
+#             OIIIval = np.nanmedian(OIII)
+#             NIIval  = np.nanmedian(NII)
 
-            Ha_val  = np.nanmedian(Halpha)
-            Hb_val  = np.nanmedian(Hbeta)
-            OIIIval = np.nanmedian(OIII)
-            NIIval  = np.nanmedian(NII)
+#             if Ha_val > 0 and Hb_val > 0 and OIIIval > 0 and NIIval > 0:
+#                 x = np.log10(NIIval / Ha_val)
+#                 y = np.log10(OIIIval / Hb_val)
 
-            if Ha_val > 0 and Hb_val > 0 and OIIIval > 0 and NIIval > 0:
-                x = np.log10(NIIval / Ha_val)
-                y = np.log10(OIIIval / Hb_val)
-
-                if magpiid in main.detection_dict:
-                    det_x.append(x)
-                    det_y.append(y)
-                else:
-                    undet_x.append(x)
-                    undet_y.append(y)
+#                 if magpiid in main.detection_dict:
+#                     det_x.append(x)
+#                     det_y.append(y)
+#                 else:
+#                     undet_x.append(x)
+#                     undet_y.append(y)
 
 # =========================
 # UNDERPLOT STATISTICS
@@ -84,17 +86,50 @@ with open(main.MAGPI_EmissionLines, mode='r') as MAGPI_Emissions:
 def get_val(magpiid, key):
     return statistics_dict.get(magpiid, {}).get(key, np.nan)
 
-detected_ids   = list(main.detection_dict.keys())
-undetected_ids = [
-    mid for mid, vals in statistics_dict.items() if mid.startswith(("1203", "1501", "1206"))
-    and vals.get("QOP", 0) >= 3 and mid not in main.detection_dict
-    and main.field_limits[mid[:4]][0] <= vals.get("redshift", np.nan) <= main.field_limits[mid[:4]][1]]
+# ---- brief build of detected/undetected ids ----
+def _sfloat(x):
+    try: return float(x)
+    except: return np.nan
+
+with open(main.MAGPI_sources, newline='') as f:
+    rdr = csv.reader(f)
+    for _ in range(18): next(rdr, None)  # skip preamble
+    in_field_good = set()
+    for row in rdr:
+        mid   = row[0]
+        field = mid[:4]
+        if field not in main.field_limits:
+            continue
+        z = _sfloat(row[6])
+        q = int(_sfloat(row[7])) if row[7] else 0
+        zmin, zmax = main.field_limits[field]
+        if q >= 3 and zmin < z < zmax:
+            in_field_good.add(mid)
+
+detected_ids   = set(main.detection_dict.keys()) & in_field_good
+undetected_ids = in_field_good - detected_ids
+other_ids = [mid for mid,v in statistics_dict.items() if 0 < v["redshift"] < 5 and mid not in detected_ids and mid not in undetected_ids]
+
+# Detections
+for mid in detected_ids:
+    Ha, Hb = get_val(mid, "Ha"), get_val(mid, "Hb")
+    O3, N2 = get_val(mid, "OIII_5008"), get_val(mid, "NII_6585")
+    if np.isfinite(Ha) and Ha > 0 and np.isfinite(Hb) and Hb > 0 and np.isfinite(O3) and O3 > 0 and np.isfinite(N2) and N2 > 0:
+        det_x.append(np.log10(N2 / Ha)), det_y.append(np.log10(O3 / Hb))
+
+# Non-detections
+for mid in undetected_ids:
+    Ha, Hb = get_val(mid, "Ha"), get_val(mid, "Hb")
+    O3, N2 = get_val(mid, "OIII_5008"), get_val(mid, "NII_6585")
+    if np.isfinite(Ha) and Ha > 0 and np.isfinite(Hb) and Hb > 0 and np.isfinite(O3) and O3 > 0 and np.isfinite(N2) and N2 > 0:
+        undet_x.append(np.log10(N2 / Ha)), undet_y.append(np.log10(O3 / Hb))
 
 # All other galaxies
-other_ids = [mid for mid,v in statistics_dict.items() if 0 < v["redshift"] < 5 and mid not in detected_ids and mid not in undetected_ids]
-other_x, other_y = zip(*[
-    (np.log10(get_val(mid,"NII_6585")/get_val(mid,"Ha")), np.log10(get_val(mid,"OIII_5008")/get_val(mid,"Hb")))
-    for mid in other_ids if get_val(mid,"Ha") > 0 and get_val(mid,"NII_6585") > 0 and get_val(mid,"Hb") > 0 and get_val(mid,"OIII_5008") > 0])
+for mid in other_ids:
+    Ha, Hb = get_val(mid, "Ha"), get_val(mid, "Hb")
+    O3, N2 = get_val(mid, "OIII_5008"), get_val(mid, "NII_6585")
+    if (np.isfinite(Ha) and Ha > 0 and np.isfinite(Hb) and Hb > 0 and np.isfinite(O3) and O3 > 0 and np.isfinite(N2) and N2 > 0):
+        other_x.append(np.log10(N2 / Ha)), other_y.append(np.log10(O3 / Hb))
 
 # =========================
 # PLOTTING
