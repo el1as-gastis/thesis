@@ -50,7 +50,7 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
             # PLOTTING
             # =========================
             fig, ax = plt.subplots(figsize=(6, 3))
-            plt.step(wavelength_rest, flux, where='mid', color='black', linewidth=.5)
+            plt.step(wavelength_rest, flux, where='mid', color='black', linewidth=.5, zorder=2)
 
             ax.xaxis.set_major_locator(ticker.AutoLocator())
             ax.yaxis.set_major_locator(ticker.AutoLocator())
@@ -115,8 +115,8 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
                 else:
                     yt = yt_low
                 ytop = yt + lvl*dy
-                ax.vlines(wl, ymin, ytop, linestyles='--', color='0.7', linewidth=0.8)
-                ax.text(wl, ytop + 0.01*(ymax - ymin), lab, ha='center', va='bottom', fontsize=7)
+                ax.vlines(wl, ymin, ytop, linestyles='--', color='0.7', linewidth=0.8, zorder=1)
+                ax.text(wl, ytop + 0.01*(ymax - ymin), lab, ha='center', va='bottom', fontsize=7, zorder=3)
 
             
             # 2) lock limits so added text doesn’t expand them back
@@ -125,6 +125,6 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
 
             outdir = f'/home/el1as/github/thesis/figures/MUSE_spectra/{main.field}'
             os.makedirs(outdir, exist_ok=True)
-            plt.savefig(f'{outdir}/{magpiid}.png', dpi=200, bbox_inches='tight')
+            plt.savefig(f'{outdir}/{magpiid}.pdf', dpi=200, bbox_inches='tight')
             plt.close()
 

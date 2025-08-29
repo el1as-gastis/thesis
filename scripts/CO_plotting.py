@@ -27,7 +27,6 @@ def safe_float(x):
         return np.nan
     return float(x.replace("−","-"))
 
-
 def load_products(path):
     out = {"id":[], "Mgas":[], "Mstar":[], "SFR":[], "redshift":[], "flag":[]}
     with open(path, newline="") as f:
@@ -259,7 +258,7 @@ fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.02), ncol
 plt.subplots_adjust(wspace=0.0, hspace=0.0)
 plt.subplots_adjust(top=0.98)   
 
-plt.savefig("/home/el1as/github/thesis/figures/CO_plot.png", dpi=300, bbox_inches="tight")
+plt.savefig("/home/el1as/github/thesis/figures/CO_plot.pdf", dpi=300, bbox_inches="tight")
 plt.close()
 
 # =========================
@@ -335,6 +334,5 @@ ax.tick_params(axis="both", which="minor", direction="in", top=True, bottom=True
 handles, labels = ax.get_legend_handles_labels()
 ax.legend(handles, labels, loc="upper left", frameon=False, fontsize=10)
 
-plt.savefig("/home/el1as/github/thesis/figures/toy_model.png", dpi=300, bbox_inches="tight")
+plt.savefig("/home/el1as/github/thesis/figures/toy_model.pdf", dpi=300, bbox_inches="tight")
 plt.close()
-

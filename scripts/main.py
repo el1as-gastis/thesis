@@ -10,9 +10,9 @@ import argparse
 # =========================
 # FIELD INFO
 # =========================
-# field = '1203'
+field = '1203'
 # field = '1206'
-field = '1501'
+# field = '1501'
 
 field_limits = {
     "1203": (0.28192678837197094, 0.3367500528951246),
@@ -72,6 +72,10 @@ ALMA_CO_products = '/home/el1as/github/thesis/data/catalogs/ALMA_CO_products.csv
 SPILKER_CO_products = '/home/el1as/github/thesis/data/catalogs/SPILKER_CO.csv'
 ATLAS3D_CO_products = '/home/el1as/github/thesis/data/catalogs/ATLAS3D_CO.csv'
 MAGPI_EmissionLines = '/home/el1as/github/thesis/data/catalogs/MAGPI_master_emission_lines.csv'
+ALMA_spectra = '/home/el1as/github/thesis/data/catalogs/ALMA_spectra.csv'
+
+colibre_z0_2 = '/home/el1as/github/thesis/data/SIMULATION/GalaxyGasProperties_z0.2.txt'
+colibre_z0_5 = '/home/el1as/github/thesis/data/SIMULATION/GalaxyGasProperties_z0.5.txt'
 
 # =========================
 # ALMA HEADER INFO

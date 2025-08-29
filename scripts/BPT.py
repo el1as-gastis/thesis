@@ -108,29 +108,30 @@ with open(main.MAGPI_sources, newline='') as f:
 
 detected_ids   = set(main.detection_dict.keys()) & in_field_good
 undetected_ids = in_field_good - detected_ids
-other_ids = [mid for mid,v in statistics_dict.items() if 0 < v["redshift"] < 5 and mid not in detected_ids and mid not in undetected_ids]
+other_ids = [mid for mid,v in statistics_dict.items() if 0.28 < v["redshift"] < 0.32 and mid not in detected_ids and mid not in undetected_ids]
 
 # Detections
+print('detections')
 for mid in detected_ids:
     Ha, Hb = get_val(mid, "Ha"), get_val(mid, "Hb")
     O3, N2 = get_val(mid, "OIII_5008"), get_val(mid, "NII_6585")
-    if np.isfinite(Ha) and Ha > 0 and np.isfinite(Hb) and Hb > 0 and np.isfinite(O3) and O3 > 0 and np.isfinite(N2) and N2 > 0:
+    if np.isfinite(Ha) and Ha != 0 and np.isfinite(Hb) and Hb != 0 and np.isfinite(O3) and O3 != 0 and np.isfinite(N2) and N2 != 0:
         det_x.append(np.log10(N2 / Ha)), det_y.append(np.log10(O3 / Hb))
-
+        print(Ha, Hb, O3, N2)
 # Non-detections
+print('non-detections')
 for mid in undetected_ids:
     Ha, Hb = get_val(mid, "Ha"), get_val(mid, "Hb")
     O3, N2 = get_val(mid, "OIII_5008"), get_val(mid, "NII_6585")
-    if np.isfinite(Ha) and Ha > 0 and np.isfinite(Hb) and Hb > 0 and np.isfinite(O3) and O3 > 0 and np.isfinite(N2) and N2 > 0:
+    if np.isfinite(Ha) and Ha != 0 and np.isfinite(Hb) and Hb != 0 and np.isfinite(O3) and O3 != 0 and np.isfinite(N2) and N2 != 0:
         undet_x.append(np.log10(N2 / Ha)), undet_y.append(np.log10(O3 / Hb))
-
 # All other galaxies
+print('other')
 for mid in other_ids:
     Ha, Hb = get_val(mid, "Ha"), get_val(mid, "Hb")
     O3, N2 = get_val(mid, "OIII_5008"), get_val(mid, "NII_6585")
-    if (np.isfinite(Ha) and Ha > 0 and np.isfinite(Hb) and Hb > 0 and np.isfinite(O3) and O3 > 0 and np.isfinite(N2) and N2 > 0):
+    if (np.isfinite(Ha) and Ha != 0 and np.isfinite(Hb) and Hb != 0 and np.isfinite(O3) and O3 != 0 and np.isfinite(N2) and N2 != 0):
         other_x.append(np.log10(N2 / Ha)), other_y.append(np.log10(O3 / Hb))
-
 # =========================
 # PLOTTING
 # =========================
@@ -187,6 +188,6 @@ plt.xlim(-1.5, 1)
 plt.ylim(-1.5, 1.5)
 
 plt.tight_layout()
-plt.savefig('/home/el1as/github/thesis/figures/BPT.png')
+plt.savefig('/home/el1as/github/thesis/figures/BPT.pdf')
 plt.close()
 

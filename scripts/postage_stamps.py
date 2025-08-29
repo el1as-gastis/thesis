@@ -96,7 +96,7 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
         # PLOTTING
         # =========================
         fig, axs = plt.subplots(1, 2, figsize=(6, 3))
-        plt.subplots_adjust(wspace=0, hspace=0)  # no space between stamps
+        # plt.subplots_adjust(wspace=0, hspace=0)  # no space between stamps
 
         # MUSE panel
         axs[0].imshow(stamp, origin='lower', extent=extent_muse, interpolation='nearest')
@@ -155,5 +155,5 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
 
         # Save
         plt.savefig(f'/home/el1as/github/thesis/figures/stamps/{main.field}/{magpiid}.png',
-                    dpi=200, bbox_inches='tight', pad_inches=0)
+                    dpi=200, bbox_inches='tight') # pad_inches=0
         plt.close(fig)

@@ -147,10 +147,40 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
         freq_axis = freq_axis[lowest_z:highest_z]
 
         # =========================
+        # UPLOAD TO / UPDATE CSV
+        # =========================
+        import json, csv, os, numpy as np
+        out_csv = main.ALMA_spectra
+
+        def tolist(arr):
+            a = np.asarray(arr, float)
+            return [None if not np.isfinite(x) else float(x) for x in a]
+
+        # build row
+        row = {
+            "magpiid": magpiid,
+            "spec_mJy": json.dumps(tolist(spectrum)),
+            "vel_kms":  json.dumps(tolist(vel_axis)),
+        }
+
+        # load existing
+        existing = {}
+        if os.path.exists(out_csv):
+            with open(out_csv) as f:
+                for r in csv.DictReader(f):
+                    existing[r["magpiid"]] = r
+
+        existing[magpiid] = row  # update/insert
+
+        # write back
+        with open(out_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["magpiid","spec_mJy","vel_kms"])
+            writer.writeheader(); writer.writerows(existing.values())
+        
+        # =========================
         # REBINNING 
         # =========================
         bin_factor, do_rebin = main.get_rebin_settings(magpiid)
-
         
         if do_rebin and bin_factor > 1:
             spectrum = main.rebin_array(spectrum, bin_factor)
@@ -282,7 +312,7 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
         # CALCULATE CO PRODUCTS
         # =========================
         if best_model is None:
-                        # --- Non-detection: estimate 3σ upper limit ---
+            # --- Non-detection: estimate 3σ upper limit ---
             # Use local rms and assume typical linewidth of 300 km/s
             sigma_chan = np.nanstd(noise_region) if len(noise_region) > 0 else 0.0
             chan_width = np.abs(np.median(np.diff(vel_axis)))  # km/s per channel
@@ -291,11 +321,13 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
             flux_limit = 3.0 * sigma_chan * np.sqrt(N_chan) * chan_width
             area_total = flux_limit  
             flag = 'upper'
+
         else:
             area_total = 0.0
             for comp_name in best_model.components:
                 area_total += best_model.params[f"{comp_name.prefix}amplitude"].value
                 flag = 'detection'
+        
         alpha_CO = 4.3   # (K km/s pc^2)
 
         # Jy/beam -> Jy (independent of aperture size/shape)
@@ -329,16 +361,15 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
             csv_reader = csv.reader(big_csv); next(csv_reader)
             for source in csv_reader:
                 if source and source[0] == magpiid:
-                    Mstar, SFR = float(source[2]), float(source[6])
+                    Mstar, SFR, SFR16, SFR84 = float(source[2]), float(source[6]), float(source[8]), float(source[9])
                     data[magpiid].extend([f"{Mstar:.6g}", f"{SFR:.6g}",f"{redshift:.4g}", f"{flag}"])
                     break
 
         # finally write everything out
         with open(main.ALMA_CO_products,"w",newline="") as f:
             w = csv.writer(f)
-            w.writerow(["id","L_CO","Mgas","Mstar","SFR", "redshift", "flag"])
+            w.writerow(["id","L_CO","Mgas","Mstar","SFR", "redshift", "flag", "SFR16", 'SFR84'])
             for mid, vals in data.items():
                 w.writerow([mid, *vals])
+            
 
-
-                

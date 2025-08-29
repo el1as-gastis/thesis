@@ -69,10 +69,10 @@ undetected_ids = [
     and main.field_limits[mid[:4]][0] <= vals.get("redshift", np.nan) <= main.field_limits[mid[:4]][1]]
 
 # Clip low SFRs
-def clip_sfr(values, ylim=1e-5):
+def clip_sfr(values, ylim=5e-4):
     """Replace NaN or values below ylim with ylim for plotting."""
     arr = np.array(values, dtype=float)
-    arr[np.isnan(arr) | (arr < ylim)] = 1e-5
+    arr[np.isnan(arr) | (arr < ylim)] = 5e-4
     return arr
 
 # convenience: pull values safely, return np.nan if missing
@@ -97,23 +97,51 @@ undetected_balmers   = clip_sfr(undetected_balmers, ylim=1e-5)
 
 # # build background population 
 underplotted_masses, underplotted_SEDs, underplotted_balmers = zip(*[(v["Mstar"], v["sfr_SED"], v["balmer_sfr"])
-    for v in statistics_dict.values() if "Mstar" in v and "sfr_SED" in v and "balmer_sfr" in v  and 0.2 < v.get("redshift") < 0.5])
+    for v in statistics_dict.values() if "Mstar" in v and "sfr_SED" in v and "balmer_sfr" in v  and 0.2 < v.get("redshift") < 0.45])
 
 # =========================
 # PLOT SED-SFR
 # =========================
 fig, ax = plt.subplots(figsize=(6, 6))
 
-plt.scatter(underplotted_masses, underplotted_SEDs, color='darkgray', alpha=1, s=25, edgecolors='none')
-plt.scatter(detected_masses, detected_SEDs, color='cornflowerblue', s=100, edgecolors='black', linewidth=0.7)
-plt.scatter(undetected_masses, undetected_SEDs, color='mediumvioletred', s=75, edgecolors='black', linewidth=0.7)
-
 plt.xscale('log')
 plt.yscale('log')
-plt.xlim(1e7, 1e12)
-plt.ylim(1e-5, 1e3)
+plt.xlim(3e7, 1e12)
+plt.ylim(5e-4, 9e1)
 plt.xlabel(r'log M [M$_\odot$]', fontsize=12)
 plt.ylabel(r'SED SFR [M$_\odot$/yr]', fontsize=12)
+
+# =========================
+# SF Main Sequence (Popesso+23) z=0.3
+# =========================
+from astropy.cosmology import Planck18 as cosmo 
+
+a0, a1 = 2.71,  -0.1860
+a2, a3 = 10.86, -0.0779
+
+# --- evaluate at z=0.3 ---
+t = cosmo.age(0.3).value 
+
+def MS_popesso(Mstar):
+    SFR_max = 10.0**(a0 + a1*t)
+    M0      = 10.0**(a2 + a3*t)
+    return SFR_max / (1.0 + (M0 / Mstar))
+
+sigma_dex = 0.5  # dex scatter
+
+ax = plt.gca()
+x0, x1 = ax.get_xlim()
+M = np.logspace(np.log10(x0), np.log10(x1), 400)
+SFR = MS_popesso(M)
+
+upper = SFR * (10**sigma_dex)
+lower = SFR / (10**sigma_dex)
+ax.plot(M, SFR, lw=1, label='MS')
+ax.fill_between(M, lower, upper, alpha=0.15, linewidth=0, zorder=1)
+
+plt.scatter(underplotted_masses, underplotted_SEDs, color='white', s=10, edgecolors='black', linewidth=0.5, zorder=2)
+plt.scatter(detected_masses, detected_SEDs, color='cornflowerblue', s=100, edgecolors='black', linewidth=0.7, zorder=4)
+plt.scatter(undetected_masses, undetected_SEDs, color='mediumvioletred', s=50, edgecolors='black', linewidth=0.7, zorder=3)
 
 ax = plt.gca()
 ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0))
@@ -121,9 +149,8 @@ ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0))
 ax.xaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
 ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
 plt.tick_params(axis='both', which='both', direction='in', top=True, right=True)
-plt.legend(loc='upper left', fontsize=6)
 plt.tight_layout()
-plt.savefig('/home/el1as/github/thesis/figures/SFRvsM.png')
+plt.savefig('/home/el1as/github/thesis/figures/SED-SFRvsM.pdf')
 plt.close()
 
 # =========================
@@ -131,17 +158,32 @@ plt.close()
 # =========================
 fig, ax = plt.subplots(figsize=(6, 6))
 
-plt.scatter(underplotted_masses, underplotted_balmers, color='darkgray', alpha=1, s=25, edgecolors='none')
-plt.scatter(detected_masses, detected_balmers, color='cornflowerblue', s=100, edgecolors='black', linewidth=0.7)
-plt.scatter(undetected_masses, undetected_balmers, color='mediumvioletred', s=75, edgecolors='black', linewidth=0.7)
-
-
 plt.xscale('log')
 plt.yscale('log')
 plt.xlim(1e7, 1e12)
-plt.ylim(5e-4, 1e2)
+plt.ylim(2e-3, 2e1)
 plt.xlabel(r'log M [M$_\odot$]', fontsize=12)
-plt.ylabel(r'Balmer SFR [M$_\odot$/yr]', fontsize=12)
+plt.ylabel(r'H$\mathrm{\alpha}$ SFR [M$_\odot$/yr]', fontsize=12)
+
+
+sigma_dex = 0.5  # dex scatter
+
+# Mass grid from current plot limits
+x0, x1 = ax.get_xlim()
+M = np.logspace(np.log10(x0), np.log10(x1), 400)
+
+# Main sequence line
+logSFR = 0.748 * np.log10(M) + -7.726
+SFR = 10**logSFR
+
+upper = SFR * (10**sigma_dex)
+lower = SFR / (10**sigma_dex)
+ax.plot(M, SFR, lw=1, label='MS')
+ax.fill_between(M, lower, upper, alpha=0.15, linewidth=0, zorder=1)
+
+plt.scatter(underplotted_masses, underplotted_balmers, color='white', s=10, edgecolors='black', linewidth=0.5, zorder=2)
+plt.scatter(detected_masses, detected_balmers, color='cornflowerblue', s=100, edgecolors='black', linewidth=0.7, zorder=4)
+plt.scatter(undetected_masses, undetected_balmers, color='mediumvioletred', s=50, edgecolors='black', linewidth=0.7, zorder=3)
 
 ax = plt.gca()
 ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0))
@@ -149,7 +191,6 @@ ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0))
 ax.xaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
 ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
 plt.tick_params(axis='both', which='both', direction='in', top=True, right=True)
-plt.legend(loc='upper left', fontsize=6)
 plt.tight_layout()
-plt.savefig('/home/el1as/github/thesis/figures/BalmerSFRvsM.png')
+plt.savefig('/home/el1as/github/thesis/figures/Ha-SFRvsM.pdf')
 plt.close()

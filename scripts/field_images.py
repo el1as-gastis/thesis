@@ -123,7 +123,7 @@ plt.text(10, rgb_image.shape[0] - 10,  # x, y in pixel coords
 
 
 plt.axis('off')
-out_png = f"/home/el1as/github/thesis/figures/MAGPI{main.field}.png"
+out_png = f"/home/el1as/github/thesis/figures/MAGPI{main.field}.pdf"
 plt.savefig(out_png, dpi=250, bbox_inches='tight', pad_inches=0)
 plt.close()
 
