@@ -66,7 +66,7 @@ TDEP_COMBINED = np.concatenate([np.repeat(TDEP_02, weight), TDEP_05])
 def binned_percentiles(x, y, nbins=25, mincount=10):
     lx = np.log10(x)
     bins = np.linspace(lx.min(), lx.max(), nbins+1)
-    xmid, y50, y05, y95 = [], [], [], []
+    xmid, y50, y05, y95, y16, y84 = [], [], [], [], [], []
     for lo, hi in zip(bins[:-1], bins[1:]):
         sel = (lx >= lo) & (lx < hi)
         if sel.sum() >= mincount:
@@ -75,10 +75,12 @@ def binned_percentiles(x, y, nbins=25, mincount=10):
             y50.append(np.median(vals))
             y05.append(np.percentile(vals, 5))
             y95.append(np.percentile(vals, 95))
-    return np.array(xmid), np.array(y50), np.array(y05), np.array(y95)
+            y16.append(np.percentile(vals, 16))
+            y84.append(np.percentile(vals, 84))
+    return np.array(xmid), np.array(y50), np.array(y05), np.array(y95), np.array(y16), np.array(y84)
 
-x_med, y50, y05, y95 = binned_percentiles(MH2_COMBINED, SFR_COMBINED)
-x_med_2, y50_2, y05_2, y95_2 = binned_percentiles(MS_COMBINED, TDEP_COMBINED)
+x_med, y50, y05, y95, y16, y84 = binned_percentiles(MH2_COMBINED, SFR_COMBINED)
+x_med_2, y50_2, y05_2, y95_2, y16_2, y84_2 = binned_percentiles(MS_COMBINED, TDEP_COMBINED)
 
 # =========================
 # LOAD MAGPI STATISTICS
@@ -152,7 +154,7 @@ ax1, ax2 = axs
 
 # For SFR vs M(H2)
 axs[0].set_xlim(3e7, 5e10)
-axs[0].set_ylim(7e-3, 8e1)
+axs[0].set_ylim(5e-2, 6e1)
 
 # SIMULATION
 axs[0].fill_between(x_med, y05, y95, color="mediumvioletred", alpha=0.20, zorder=0)
@@ -171,10 +173,10 @@ axs[0].set_ylabel(r"${\rm SFR}\ [M_\odot\,{\rm yr}^{-1}]$", fontsize=12)
 
 # For TDEP vs MSTAR
 axs[1].set_xlim(9e8, 7e11)
-axs[1].set_ylim(5e-4, 2e1)
+axs[1].set_ylim(8e-2, 7e0)
 
 # SIMULATION
-axs[1].fill_between(x_med_2, y05_2, y95_2, color="mediumvioletred", alpha=0.20, zorder=0)
+axs[1].fill_between(x_med_2, y16_2, y84_2, color="mediumvioletred", alpha=0.20, zorder=0)
 axs[1].plot(x_med_2, y50_2, linestyle=(0,(3,1)), color="mediumvioletred", lw=1.6, label="COLIBRE z~0.3", zorder=1)
 # axs[1].scatter(MS_COMBINED, TDEP_COMBINED, color='white', s=5, edgecolors='black', linewidth=0.5)
 # RIGHT: t_dep vs Mstar (enforce your M* cut + SFR floor)
@@ -201,7 +203,7 @@ for ax in (ax1, ax2):
     ax.legend(frameon=False, fontsize=10, loc="best")
 
 plt.tight_layout()
-plt.savefig("/home/el1as/github/thesis/figures/simulation/colibre_sfr_vs_mh2.pdf", dpi=300, bbox_inches="tight")
+plt.savefig("/home/el1as/github/thesis/figures/simulation/colibre_plot.pdf", dpi=300, bbox_inches="tight")
 plt.close()
 
 print((MAGPI["SFR"]))
