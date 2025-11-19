@@ -10,9 +10,9 @@ import argparse
 # =========================
 # FIELD INFO
 # =========================
-field = '1203'
+# field = '1203'
 # field = '1206'
-# field = '1501'
+field = '1501'
 
 field_limits = {
     "1203": (0.28192678837197094, 0.3367500528951246),
@@ -25,11 +25,6 @@ detections = [['1203040085', -2, 11, 4], ['1203076068', -9, 10, 2],
               ['1206030269', -14, 0, 4],
               ['1501176107', -12, 2, 4], ['1501224275', -10, 5, 4], ['1501259290', -8, 6, 2]]
 
-# # list of detection IDs, REBINNED linewidth indexes, and rebin factors
-# detections = [['1203040085', 11, 17, 4], ['1203076068', 21, 29, 2], 
-#               ['1206030269', 9, 12, 4],
-#               ['1501176107', 9, 13, 4], ['1501224275', 9, 15, 4], ['1501259290', 20, 28, 2]]
-
 # Convert to dictionary for fast lookups
 detection_dict = {d[0]: d for d in detections}
 
@@ -41,7 +36,7 @@ tentative = '1203081168, 1203153287, 1203276130'
 def get_rebin_settings(magpiid):
     """Return bin_factor and do_rebin flag for a given source."""
     # Default bin factor
-    bin_factor = 4
+    bin_factor = 6
 
     # Override if detection-specific value exists
     if magpiid in detection_dict:
@@ -71,6 +66,8 @@ balmer_SFRs = '/home/el1as/github/thesis/data/catalogs/MAGPI_Balmer_SFRs_onedspe
 ALMA_CO_products = '/home/el1as/github/thesis/data/catalogs/ALMA_CO_products.csv'
 SPILKER_CO_products = '/home/el1as/github/thesis/data/catalogs/SPILKER_CO.csv'
 ATLAS3D_CO_products = '/home/el1as/github/thesis/data/catalogs/ATLAS3D_CO.csv'
+MASSIVE_CO_products = '/home/el1as/github/thesis/data/catalogs/MASSIVE_CO.csv'
+SQUIGGLE_CO_products = '/home/el1as/github/thesis/data/catalogs/SQUIGGLE_CO.csv'
 MAGPI_EmissionLines = '/home/el1as/github/thesis/data/catalogs/MAGPI_master_emission_lines.csv'
 ALMA_spectra = '/home/el1as/github/thesis/data/catalogs/ALMA_spectra.csv'
 
@@ -144,4 +141,5 @@ for i in range(1000):
     noise_rms_vals.append(1000 * np.std(noise_cube[np.isfinite(noise_cube)]))
 
 median_rms = np.median(noise_rms_vals)
+
 

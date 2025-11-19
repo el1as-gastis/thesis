@@ -14,6 +14,14 @@ from astropy.stats import mad_std
 import main
 import field_images
 
+import matplotlib as mpl
+mpl.rcParams.update({
+    "text.usetex": False,     # <- turn off TeX
+    "font.family": "serif",
+    "mathtext.fontset": "cm", # Computer Modern-style math
+    "pdf.fonttype": 42, "ps.fonttype": 42,
+})
+
 from main import get_rebin_settings, rebin_array
 
 with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
@@ -115,10 +123,15 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
             ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
             ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.5))
             ax.tick_params(axis="both", which="major", direction="in", top=True, bottom=True,
-                           left=True, right=True, length=5, width=1, labelleft=False,
+                           left=True, right=True, length=5, width=0.5, labelleft=False,
                            labelbottom=False, labelright=False, labeltop=False)
             ax.tick_params(axis="both", which="minor", direction="in", top=True, bottom=True,
-                           left=True, right=True, length=2.5, width=1)
+                           left=True, right=True, length=2.5, width=0.5)
+            
+        
+        # Crosshair at (0, 0) in ALMA panel (white)
+        axs[1].axhline(0, color='white', lw=0.9, alpha=1, zorder=6)
+        axs[1].axvline(0, color='white', lw=0.9, alpha=1, zorder=6)
 
         # Scale bars (2") in arcsec coords
         axs[0].add_patch(patches.Rectangle((extent_muse[1]-3, extent_muse[2]+1), 2, 0.125, color='white'))
@@ -154,6 +167,6 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
         # axs[1].plot(0, 0, marker='o', color='lime', markersize=4, markeredgecolor='black', zorder=6)
 
         # Save
-        plt.savefig(f'/home/el1as/github/thesis/figures/stamps/{main.field}/{magpiid}.png',
+        plt.savefig(f'/home/el1as/github/thesis/figures/stamps/{main.field}/{magpiid}.pdf',
                     dpi=200, bbox_inches='tight') # pad_inches=0
         plt.close(fig)

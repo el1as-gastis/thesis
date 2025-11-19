@@ -11,6 +11,15 @@ import matplotlib.ticker as ticker
 
 import main
 
+import matplotlib as mpl
+mpl.rcParams.update({
+    "text.usetex": False,     # <- turn off TeX
+    "font.family": "serif",
+    "mathtext.fontset": "cm", # Computer Modern-style math
+    "pdf.fonttype": 42, "ps.fonttype": 42,
+})
+
+
 # =========================
 # ADD STATISTICS
 # =========================
@@ -102,14 +111,14 @@ underplotted_masses, underplotted_SEDs, underplotted_balmers = zip(*[(v["Mstar"]
 # =========================
 # PLOT SED-SFR
 # =========================
-fig, ax = plt.subplots(figsize=(6, 6))
+fig, ax = plt.subplots(figsize=(5, 5))
 
 plt.xscale('log')
 plt.yscale('log')
 plt.xlim(3e7, 1e12)
 plt.ylim(5e-4, 9e1)
 plt.xlabel(r'log M [M$_\odot$]', fontsize=12)
-plt.ylabel(r'SED SFR [M$_\odot$/yr]', fontsize=12)
+plt.ylabel(r'SED-SFR [M$_\odot$/yr]', fontsize=12)
 
 # =========================
 # SF Main Sequence (Popesso+23) z=0.3
@@ -127,7 +136,7 @@ def MS_popesso(Mstar):
     M0      = 10.0**(a2 + a3*t)
     return SFR_max / (1.0 + (M0 / Mstar))
 
-sigma_dex = 0.5  # dex scatter
+sigma_dex = 0.9  # dex scatter
 
 ax = plt.gca()
 x0, x1 = ax.get_xlim()
@@ -136,19 +145,41 @@ SFR = MS_popesso(M)
 
 upper = SFR * (10**sigma_dex)
 lower = SFR / (10**sigma_dex)
-ax.plot(M, SFR, lw=1, label='MS')
+ax.plot(M, SFR, lw=1, label='Popesso+23')
 ax.fill_between(M, lower, upper, alpha=0.15, linewidth=0, zorder=1)
 
 plt.scatter(underplotted_masses, underplotted_SEDs, color='white', s=10, edgecolors='black', linewidth=0.5, zorder=2)
-plt.scatter(detected_masses, detected_SEDs, color='cornflowerblue', s=100, edgecolors='black', linewidth=0.7, zorder=4)
-plt.scatter(undetected_masses, undetected_SEDs, color='mediumvioletred', s=50, edgecolors='black', linewidth=0.7, zorder=3)
+plt.scatter(detected_masses, detected_SEDs, color='cornflowerblue', s=60, edgecolors='black', linewidth=0.7, zorder=4, label='CO Detected')
+plt.scatter(undetected_masses, undetected_SEDs, color='crimson', s=60, edgecolors='black', linewidth=0.7, zorder=3, label='CO Undetected')
+
+
+# ---- label MAGPI IDs (SED plot) ----
+# detected
+for mid, x, y in zip(detected_ids, detected_masses, detected_SEDs):
+    if np.isfinite(x) and np.isfinite(y):
+        ax.annotate(mid, (x, y), xytext=(0, 6), textcoords='offset points',
+                    ha='center', va='bottom', fontsize=6, color='black')
+
+# undetected
+for mid, x, y in zip(undetected_ids, undetected_masses, undetected_SEDs):
+    if np.isfinite(x) and np.isfinite(y):
+        ax.annotate(mid, (x, y), xytext=(0, 6), textcoords='offset points',
+                    ha='center', va='bottom', fontsize=6, color='black')
+
+
+ax.legend(loc='upper left', frameon=False, fontsize=8)
 
 ax = plt.gca()
 ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0))
 ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0))
 ax.xaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
 ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
-plt.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+ax.tick_params(axis="both", which="major", direction="in", top=True, bottom=True,
+                left=True, right=True, length=5, width=0.5,
+                labelright=False, labeltop=False)
+ax.tick_params(axis="both", which="minor", direction="in", top=True, bottom=True,
+                left=True, right=True, length=2.5, width=0.5)
+
 plt.tight_layout()
 plt.savefig('/home/el1as/github/thesis/figures/SED-SFRvsM.pdf')
 plt.close()
@@ -156,14 +187,14 @@ plt.close()
 # =========================
 # BLOT BALMER SFR
 # =========================
-fig, ax = plt.subplots(figsize=(6, 6))
+fig, ax = plt.subplots(figsize=(5, 5))
 
 plt.xscale('log')
 plt.yscale('log')
-plt.xlim(1e7, 1e12)
-plt.ylim(2e-3, 2e1)
+plt.xlim(3e7, 1e12)
+plt.ylim(5e-4, 9e1)
 plt.xlabel(r'log M [M$_\odot$]', fontsize=12)
-plt.ylabel(r'H$\mathrm{\alpha}$ SFR [M$_\odot$/yr]', fontsize=12)
+plt.ylabel(r'H$\mathrm{\alpha}$-SFR [M$_\odot$/yr]', fontsize=12)
 
 
 sigma_dex = 0.5  # dex scatter
@@ -178,19 +209,42 @@ SFR = 10**logSFR
 
 upper = SFR * (10**sigma_dex)
 lower = SFR / (10**sigma_dex)
-ax.plot(M, SFR, lw=1, label='MS')
+ax.plot(M, SFR, lw=1, label='Mun+24')
 ax.fill_between(M, lower, upper, alpha=0.15, linewidth=0, zorder=1)
 
 plt.scatter(underplotted_masses, underplotted_balmers, color='white', s=10, edgecolors='black', linewidth=0.5, zorder=2)
-plt.scatter(detected_masses, detected_balmers, color='cornflowerblue', s=100, edgecolors='black', linewidth=0.7, zorder=4)
-plt.scatter(undetected_masses, undetected_balmers, color='mediumvioletred', s=50, edgecolors='black', linewidth=0.7, zorder=3)
+plt.scatter(detected_masses, detected_balmers, color='cornflowerblue', s=60, edgecolors='black', linewidth=0.7, zorder=4, label='CO Detected')
+plt.scatter(undetected_masses, undetected_balmers, color='crimson', s=60, edgecolors='black', linewidth=0.7, zorder=3, label='CO Undetected')
+
+
+# ---- label MAGPI IDs (Hα plot) ----
+# detected
+for mid, x, y in zip(detected_ids, detected_masses, detected_balmers):
+    if np.isfinite(x) and np.isfinite(y):
+        ax.annotate(mid, (x, y), xytext=(0, 6), textcoords='offset points',
+                    ha='center', va='bottom', fontsize=6, color='black')
+
+# undetected
+for mid, x, y in zip(undetected_ids, undetected_masses, undetected_balmers):
+    if np.isfinite(x) and np.isfinite(y):
+        ax.annotate(mid, (x, y), xytext=(0, 6), textcoords='offset points',
+                    ha='center', va='bottom', fontsize=6, color='black')
+
+
+ax.legend(loc='upper left', frameon=False, fontsize=8)
+
 
 ax = plt.gca()
 ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0))
 ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0))
 ax.xaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
 ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs='auto'))
-plt.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+ax.tick_params(axis="both", which="major", direction="in", top=True, bottom=True,
+                left=True, right=True, length=5, width=0.5,
+                labelright=False, labeltop=False)
+ax.tick_params(axis="both", which="minor", direction="in", top=True, bottom=True,
+                left=True, right=True, length=2.5, width=0.5)
+
 plt.tight_layout()
 plt.savefig('/home/el1as/github/thesis/figures/Ha-SFRvsM.pdf')
 plt.close()

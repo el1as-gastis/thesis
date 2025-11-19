@@ -18,6 +18,15 @@ from astropy.stats import mad_std
 from scipy import ndimage
 from astropy.cosmology import Planck18 as cosmo
 
+import matplotlib as mpl
+mpl.rcParams.update({
+    "text.usetex": False,     # <- turn off TeX
+    "font.family": "serif",
+    "mathtext.fontset": "cm", # Computer Modern-style math
+    "pdf.fonttype": 42, "ps.fonttype": 42,
+    "font.size": 15,
+})
+
 import main
 import postage_stamps
 
@@ -176,7 +185,7 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
         with open(out_csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["magpiid","spec_mJy","vel_kms"])
             writer.writeheader(); writer.writerows(existing.values())
-        
+
         # =========================
         # REBINNING 
         # =========================
@@ -254,7 +263,10 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
 
             # Fit and choose
             fit1, fit2 = fit_gaussians(1), fit_gaussians(2)
-            best_model = fit2 if fit2.aic < fit1.aic else fit1
+            if '9290' in magpiid:
+                best_model = fit2
+            else:   
+                best_model = fit2 if fit2.aic < fit1.aic else fit1
 
         # =========================
         # PLOTTING
@@ -273,10 +285,10 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
         ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
         ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
         ax.tick_params(axis="both", which="major", direction="in", top=True, bottom=True,
-                           left=True, right=True, length=4.5, width=1,
+                           left=True, right=True, length=4.5, width=0.5,
                            labelright=False, labeltop=False)
         ax.tick_params(axis="both", which="minor", direction="in", top=True, bottom=True,
-                           left=True, right=True, length=2, width=1)
+                           left=True, right=True, length=2, width=0.5)
         
         ax.axhline(0, color='black', linewidth=0.75)
 
@@ -299,34 +311,39 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
         # ax.axvline(vel_axis[sig_start-1], color='red', linestyle='--', linewidth=1, label='sig_start')
         # ax.axvline(vel_axis[sig_end], color='blue', linestyle='--', linewidth=1, label='sig_end')
 
+        # Vertical reference at systemic velocity (v - cz = 0)
+        ax.axvline(0, color='black', linestyle='--', linewidth=1, alpha=0.75)
+
+
         if best_model is not None:
             vel_fit = np.linspace(vel_axis.min(), vel_axis.max(), 500)
             ax.plot(vel_fit, best_model.eval(x=vel_fit), color='red', lw=1)
 
         outdir = f'/home/el1as/github/thesis/figures/ALMA_spectra/{main.field}'
         os.makedirs(outdir, exist_ok=True)
-        plt.savefig(f'{outdir}/{magpiid}.png', dpi=200, bbox_inches='tight')
+        plt.savefig(f'{outdir}/{magpiid}.pdf', dpi=200, bbox_inches='tight')
         plt.close()
 
         # =========================
         # CALCULATE CO PRODUCTS
         # =========================
         if best_model is None:
-            # --- Non-detection: estimate 3σ upper limit ---
-            # Use local rms and assume typical linewidth of 300 km/s
-            sigma_chan = np.nanstd(noise_region) if len(noise_region) > 0 else 0.0
-            chan_width = np.abs(np.median(np.diff(vel_axis)))  # km/s per channel
-            line_width = 300.0                                # km/s assumption
-            N_chan = int(line_width / chan_width)
-            flux_limit = 3.0 * sigma_chan * np.sqrt(N_chan) * chan_width
-            area_total = flux_limit  
-            flag = 'upper'
+            # 3σ UL with assumed linewidth W (km/s), using per-channel rms and Δv from cube header
+            sigma_chan = float(np.nanstd(noise_region[np.isfinite(noise_region)])) if len(noise_region) > 0 else np.nan
+            # channel width from frequency grid (robust; avoids np.diff issues)
+            dv = float(main.c * (main.bin_width / (main.CO_rest_GHz / (1.0 + redshift))))  # km/s per channel
+            dv = abs(dv) if np.isfinite(dv) and dv > 0 else 1e-3
 
+            W = 300.0  # set 800.0 if you want Spilker-style
+            # F_UL(3σ) = 3 * σ_chan * sqrt(W * Δv)  [mJy km/s]
+            flux_limit = 3.0 * sigma_chan * np.sqrt(W * dv)
+            area_total = flux_limit
+            flag = 'upper'
         else:
             area_total = 0.0
             for comp_name in best_model.components:
                 area_total += best_model.params[f"{comp_name.prefix}amplitude"].value
-                flag = 'detection'
+            flag = 'detection'
         
         alpha_CO = 4.3   # (K km/s pc^2)
 
@@ -371,5 +388,244 @@ with open(main.MAGPI_sources, mode='r', newline='') as MAGPI_sources:
             w.writerow(["id","L_CO","Mgas","Mstar","SFR", "redshift", "flag", "SFR16", 'SFR84'])
             for mid, vals in data.items():
                 w.writerow([mid, *vals])
-            
+        
+        # ---------- pull medians and percentiles from big.csv (use these indices) ----------
+        # big.csv columns:
+        # 0 MAGPIID, 1 z, 2 StellarMass_bestfit, 3 StellarMass_median, 4 StellarMass_16, 5 StellarMass_84,
+        # 6 SFRburst_bestfit, 7 SFRburst_median, 8 SFRburst_16, 9 SFRburst_84
+        Mstar_med = SFR_med = Mstar_p16 = Mstar_p84 = SFR_p16 = SFR_p84 = np.nan
+        with open(main.big_csv, mode='r') as big_csv:
+            rdr = csv.reader(big_csv); next(rdr, None)
+            for r in rdr:
+                if r and r[0] == magpiid:
+                    Mstar_med = float(r[3])  # intended: log10(M*/Msun)
+                    Mstar_p16 = float(r[4])
+                    Mstar_p84 = float(r[5])
+                    SFR_med   = float(r[7])  # Msun/yr (linear)
+                    SFR_p16   = float(r[8])
+                    SFR_p84   = float(r[9])
+                    break
 
+        # --- ensure stellar masses are in log10 space (safety if big.csv had linear by mistake) ---
+        def as_log10_mass(x):
+            if not np.isfinite(x) or x <= 0: return np.nan
+            # log10(M*/Msun) should be ~ 7–12; if it's huge, assume linear and convert
+            return np.log10(x) if x > 20 else x
+
+        Mstar_med_log = as_log10_mass(Mstar_med)
+        Mstar_p16_log = as_log10_mass(Mstar_p16)
+        Mstar_p84_log = as_log10_mass(Mstar_p84)
+
+        # errors (dex) from percentiles (asymmetric)
+        logMstar_lo = Mstar_med_log - Mstar_p16_log if np.isfinite(Mstar_med_log) and np.isfinite(Mstar_p16_log) else np.nan
+        logMstar_hi = Mstar_p84_log - Mstar_med_log if np.isfinite(Mstar_med_log) and np.isfinite(Mstar_p84_log) else np.nan
+
+        # SFR errors (linear)
+        sfr_lo = SFR_med - SFR_p16 if np.isfinite(SFR_med) and np.isfinite(SFR_p16) else np.nan
+        sfr_hi = SFR_p84 - SFR_med if np.isfinite(SFR_med) and np.isfinite(SFR_p84) else np.nan
+
+        # ---------- Sco (in mJy km/s) and its uncertainty ----------
+        def sco_error_jykms_from_fit(fit):
+            if fit is None:
+                return np.nan
+            area_err_mJy = 0.0
+            for comp in fit.components:
+                par = fit.params.get(f"{comp.prefix}amplitude", None)
+                if par is not None and (par.stderr is not None) and np.isfinite(par.stderr):
+                    area_err_mJy += par.stderr**2
+            area_err_mJy = np.sqrt(area_err_mJy)  # mJy km/s
+            # convert mJy->Jy and apply beam corr to match L_CO pipeline:
+            return (area_err_mJy/1000.0) * beam_corr  # Jy km/s
+
+        Sco_Jy_km_s     = L_CO                              # from your pipeline (Jy km/s)
+        Sco_err_Jy_km_s = sco_error_jykms_from_fit(best_model)
+
+        Sco_mJy_km_s     = 1000.0 * Sco_Jy_km_s             # now in mJy km/s
+        Sco_err_mJy_km_s = 1000.0 * Sco_err_Jy_km_s if np.isfinite(Sco_err_Jy_km_s) else np.nan
+
+        # ---------- logMH2 error from Sco (detections only), stays in dex ----------
+        if np.isfinite(Sco_Jy_km_s) and np.isfinite(Sco_err_Jy_km_s) and Sco_Jy_km_s > 0 and flag == 'detection':
+            rel = Sco_err_Jy_km_s / Sco_Jy_km_s
+            logMH2_err = 0.434 * rel
+        else:
+            logMH2_err = np.nan
+
+        # ---------- write/update separate RESULT CSV ----------
+        result_path = os.path.join(os.path.dirname(main.ALMA_CO_products), "ALMA_result_table.csv")
+
+        row_out = {
+            "MAGPIID":                  magpiid,
+            "RA_deg":                   f"{ra:.7f}",
+            "Dec_deg":                  f"{dec:.7f}",
+            "z_spec":                   f"{redshift:.4f}",
+            # masses in log10 (dex)
+            "logmstar_mo":              f"{Mstar_med_log:.2f}" if np.isfinite(Mstar_med_log) else "",
+            "logmstar_mo_err_lo":       f"{logMstar_lo:.2f}"   if np.isfinite(logMstar_lo)   else "",
+            "logmstar_mo_err_hi":       f"{logMstar_hi:.2f}"   if np.isfinite(logMstar_hi)   else "",
+            # SFR linear
+            "sfr":                      f"{SFR_med:.2f}" if np.isfinite(SFR_med) else "",
+            "sfr_err_lo":               f"{sfr_lo:.2f}"  if np.isfinite(sfr_lo)  else "",
+            "sfr_err_hi":               f"{sfr_hi:.2f}"  if np.isfinite(sfr_hi)  else "",
+            # Sco in mJy km/s
+            "Sco(1-0)_mJy_km_s":        f"{Sco_mJy_km_s:.2f}"     if np.isfinite(Sco_mJy_km_s)     else "",
+            "Sco_err_mJy_km_s":         f"{Sco_err_mJy_km_s:.2f}" if np.isfinite(Sco_err_mJy_km_s) else "",
+            # logMH2 already in log form — keep as log, just format
+            "logMH2_mo":                f"{np.log10(Mgas):.2f}" if (np.isfinite(Mgas) and Mgas>0) else "",  # if you already computed log, just keep that value instead
+            "logMH2_mo_err":            f"{logMH2_err:.2f}" if np.isfinite(logMH2_err) else "",
+            "flag":                     flag,  # 'detection' or 'upper'
+        }
+
+        # keep/update previous rows
+        existing = {}
+        if os.path.exists(result_path):
+            with open(result_path, "r", newline="") as f:
+                rdr = csv.DictReader(f)
+                for r in rdr:
+                    existing[r["MAGPIID"]] = r
+
+        existing[magpiid] = row_out
+
+        with open(result_path, "w", newline="") as f:
+            cols = ["MAGPIID","RA_deg","Dec_deg","z_spec",
+                    "logmstar_mo","logmstar_mo_err_lo","logmstar_mo_err_hi",
+                    "sfr","sfr_err_lo","sfr_err_hi",
+                    "Sco(1-0)_mJy_km_s","Sco_err_mJy_km_s",
+                    "logMH2_mo","logMH2_mo_err","flag"]
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader(); w.writerows(existing.values())
+
+# =========================
+# MEDIANS with error-only MC (no galaxy resampling)
+# =========================
+import numpy as np, pandas as pd, os
+
+result_path = os.path.join(os.path.dirname(main.ALMA_CO_products), "ALMA_result_table.csv")
+df = pd.read_csv(result_path)
+
+# detections only, with needed cols
+det = df[(df["flag"] == "detection")].copy()
+det["MAGPIID"] = det["MAGPIID"].astype(str)
+
+# arrays (dex)
+logMgas_mu   = pd.to_numeric(det["logMH2_mo"], errors="coerce").to_numpy()
+logMgas_sig  = pd.to_numeric(det["logMH2_mo_err"], errors="coerce").to_numpy()     # symmetric (from Sco)
+logMstar_mu  = pd.to_numeric(det["logmstar_mo"], errors="coerce").to_numpy()
+logMstar_lo  = pd.to_numeric(det["logmstar_mo_err_lo"], errors="coerce").to_numpy()  # dex
+logMstar_hi  = pd.to_numeric(det["logmstar_mo_err_hi"], errors="coerce").to_numpy()  # dex
+
+# clean NaNs (treat missing errors as zero to avoid blowing up draws)
+logMgas_sig  = np.nan_to_num(logMgas_sig,  nan=0.0)
+logMstar_lo  = np.nan_to_num(logMstar_lo,  nan=0.0)
+logMstar_hi  = np.nan_to_num(logMstar_hi,  nan=0.0)
+
+# masks
+SB_IDS   = {"1203076068"}               # your starburst to exclude when requested
+mask_ex  = ~det["MAGPIID"].isin(SB_IDS) # exclude SB
+
+NBOOT, NGAL = 50000, logMgas_mu.size
+rng = np.random.default_rng(42)
+
+def draw_splitnorm(mu, sig_lo, sig_hi, nboot):
+    """
+    Draw from a split-normal around mu with left/right sigmas (dex).
+    mu, sig_lo, sig_hi: shape (G,)
+    Returns: array (nboot, G)
+    """
+    mu      = np.asarray(mu, float)
+    sig_lo  = np.asarray(sig_lo, float)
+    sig_hi  = np.asarray(sig_hi, float)
+
+    Z   = rng.standard_normal((nboot, mu.size))
+    U   = rng.random((nboot, mu.size))
+    p   = np.divide(sig_lo, sig_lo + sig_hi, out=np.zeros_like(sig_lo), where=(sig_lo+sig_hi)>0)
+    use_lo = U < p  # (nboot, G)
+
+    SIG = np.where(use_lo, sig_lo, sig_hi)  # broadcast
+    return mu + Z * SIG
+
+# Draw MH2 (symmetric err) and M* (split-normal err)
+logMgas_draw  = logMgas_mu + rng.standard_normal((NBOOT, NGAL)) * logMgas_sig
+logMstar_draw = draw_splitnorm(logMstar_mu, logMstar_lo, logMstar_hi, NBOOT)
+
+# Compute f_gas = M_H2 / M_* using both uncertainties
+fg_draw       = 10.0 ** (logMgas_draw - logMstar_draw)
+
+def med_q16_q84(arr2d, axis=1):
+    med = np.median(arr2d, axis=axis)
+    lo  = np.percentile(arr2d, 16, axis=axis)
+    hi  = np.percentile(arr2d, 84, axis=axis)
+    return med, lo, hi
+
+# -------- Point estimates (raw medians, no noise) --------
+med_logMgas_raw      = float(np.median(logMgas_mu))
+med_logMgas_raw_ex   = float(np.median(logMgas_mu[mask_ex]))
+
+med_logMstar_raw     = float(np.median(logMstar_mu))
+med_logMstar_raw_ex  = float(np.median(logMstar_mu[mask_ex]))
+
+fg_raw               = 10.0**(logMgas_mu - logMstar_mu)
+fg_raw_ex            = 10.0**(logMgas_mu[mask_ex] - logMstar_mu[mask_ex])
+med_fg_raw           = float(np.median(fg_raw))
+med_fg_raw_ex        = float(np.median(fg_raw_ex))
+
+# -------- Uncertainties from error-only MC (no galaxy resampling) --------
+# For each draw: take the median across galaxies -> a vector of length NBOOT.
+# Then take the 16th/84th percentiles of that vector.
+
+# MH2
+meds_logMgas      = np.median(logMgas_draw, axis=1)                 # (NBOOT,)
+meds_logMgas_ex   = np.median(logMgas_draw[:, mask_ex], axis=1)
+lo_logMgas_draw   = np.percentile(meds_logMgas, 16)
+hi_logMgas_draw   = np.percentile(meds_logMgas, 84)
+lo_logMgas_draw_ex= np.percentile(meds_logMgas_ex, 16)
+hi_logMgas_draw_ex= np.percentile(meds_logMgas_ex, 84)
+
+# M*
+meds_logMstar       = np.median(logMstar_draw, axis=1)
+meds_logMstar_ex    = np.median(logMstar_draw[:, mask_ex], axis=1)
+lo_logMstar_draw    = np.percentile(meds_logMstar, 16)
+hi_logMstar_draw    = np.percentile(meds_logMstar, 84)
+lo_logMstar_draw_ex = np.percentile(meds_logMstar_ex, 16)
+hi_logMstar_draw_ex = np.percentile(meds_logMstar_ex, 84)
+
+# f_gas = M_H2 / M_*
+meds_fg        = np.median(fg_draw, axis=1)
+meds_fg_ex     = np.median(fg_draw[:, mask_ex], axis=1)
+lo_fg_draw     = np.percentile(meds_fg, 16)
+hi_fg_draw     = np.percentile(meds_fg, 84)
+lo_fg_draw_ex  = np.percentile(meds_fg_ex, 16)
+hi_fg_draw_ex  = np.percentile(meds_fg_ex, 84)
+
+
+def fmt_pm(center, lo, hi, nd=2):
+    return f"{center:.{nd}f} (−{center-lo:.{nd}f}/+{hi-center:.{nd}f})"
+
+def sci(x, nd=2):
+    return f"{x:.{nd}e}" if np.isfinite(x) else "nan"
+
+def fmt_pm_dex(center, lo, hi, nd=2):
+    # for log10 values
+    return f"{center:.{nd}f} (−{center-lo:.{nd}f}/+{hi-center:.{nd}f})"
+
+def fmt_pm_sci(center, lo, hi, nd=2):
+    # for linear quantities (e.g., f_gas) in scientific notation
+    return f"{sci(center, nd)} (−{sci(center-lo, nd)}/+{sci(hi-center, nd)})"
+
+
+print("\n==== Medians with error-only MC (center = raw median) ====")
+print(f"N detections: {NGAL} ; N(excl. SB): {int(mask_ex.sum())}  [excluded: {', '.join(sorted(SB_IDS))}]")
+
+print("\nlog M_H2 [dex]")
+print("  incl. SB :", fmt_pm(med_logMgas_raw,      lo_logMgas_draw,      hi_logMgas_draw))
+print("  excl. SB :", fmt_pm(med_logMgas_raw_ex,   lo_logMgas_draw_ex,   hi_logMgas_draw_ex))
+
+print("\nlog M_* [dex]")
+print("  incl. SB :", fmt_pm(med_logMstar_raw,     lo_logMstar_draw,     hi_logMstar_draw))
+print("  excl. SB :", fmt_pm(med_logMstar_raw_ex,  lo_logMstar_draw_ex,  hi_logMstar_draw_ex))
+
+print("\nf_gas = M_H2/M_*")
+print("  incl. SB :", fmt_pm(med_fg_raw,           lo_fg_draw,            hi_fg_draw,    nd=3))
+print("  excl. SB :", fmt_pm(med_fg_raw_ex,        lo_fg_draw_ex,         hi_fg_draw_ex, nd=3))
+
+print("\n[Note] Errors reflect propagated measurement uncertainties in log M_H2 and log M_* only.")
+print("       Systematic α_CO scatter (~0.3 dex) is not folded into these intervals and should be quoted separately.")
